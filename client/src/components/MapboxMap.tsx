@@ -4,26 +4,28 @@ import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-// You'll need to add your Mapbox token to environment variables
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiZXhhbXBsZSIsImEiOiJjbGV4YW1wbGUifQ.example';
+
+// const MAPBOX_TOKEN = process.env['NEXT_PUBLIC_MAPBOX_TOKEN'];
+const MAPBOX_TOKEN = process.env[NEXT_PUBLIC_MAPBOX_TOKEN];
 
 export default function MapboxMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
 
   useEffect(() => {
-    if (map.current) return; // Initialize map only once
+    //if (map.current) return; // Initialize map only once
+    if (!mapContainer.current) return; // checks the div is rendered
 
     // Check if we have a valid Mapbox token
-    if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes('example')) {
-      console.warn('Mapbox token not configured. Using placeholder map.');
+    if (!MAPBOX_TOKEN) {
+      console.warn('Mapbox token is null');
       return;
     }
 
     mapboxgl.accessToken = MAPBOX_TOKEN;
 
     map.current = new mapboxgl.Map({
-      container: mapContainer.current!,
+      container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [11.5761, 48.1374], // Munich coordinates (based on the image)
       zoom: 15,
@@ -31,6 +33,8 @@ export default function MapboxMap() {
       bearing: 0,
       antialias: true
     });
+
+    console.log("created new map");
 
     // Add navigation controls
     map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
@@ -66,7 +70,7 @@ export default function MapboxMap() {
       el.textContent = iconMap[marker.type as keyof typeof iconMap];
 
       new mapboxgl.Marker(el)
-        .setLngLat(marker.coordinates)
+        .setLngLat(marker.coordinates as [number, number])
         .addTo(map.current!);
     });
 
@@ -75,8 +79,10 @@ export default function MapboxMap() {
     };
   }, []);
 
+  return <div ref={mapContainer} className="absolute inset-0 w-full h-full" />;
+
   // If no valid Mapbox token, show placeholder
-  if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes('example')) {
+  if (!MAPBOX_TOKEN) {
     return (
       <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
         {/* Placeholder map background with city-like pattern */}
@@ -111,12 +117,4 @@ export default function MapboxMap() {
       </div>
     );
   }
-
-  return (
-    <div 
-      ref={mapContainer} 
-      className="w-full h-full"
-      style={{ width: '100%', height: '100%' }}
-    />
-  );
 }

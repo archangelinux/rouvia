@@ -22,16 +22,30 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim()) {
-      const newMessage: ChatMessage = {
-        id: Date.now().toString(),
-        text: message.trim(),
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, newMessage]);
-      setMessage('');
+    if (!message.trim()) return;
+
+    const newMessage: ChatMessage = {
+      id: Date.now().toString(),
+      text: message.trim(),
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setMessage('');
+    
+     try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMessage),
+      });
+
+      const result = await res.json();
+      console.log('Server response:', result);
+      } catch (err) {
+      console.error('Failed to send message:', err);
     }
   };
 

@@ -1,11 +1,14 @@
 'use client';
 
+import React, { useState } from 'react'; 
 import MapboxMap from '@/components/MapboxMap';
 import UserProfile from '@/components/UserProfile';
 import ChatInterface from '@/components/ChatInterface';
 import RouteResults from '@/components/RouteResults';
 
 export default function Home() {
+  const [chatOpen, setChatOpen] = useState(true);
+
   return (
     <div className="relative w-full h-screen overflow-hidden">
       {/* Mapbox Map - Full Background */}
