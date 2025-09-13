@@ -1,0 +1,14 @@
+{
+  "name": "rouvia-server",
+  "version": "1.0.0",
+  "description": "Backend server for Rouvia application",
+  "main": "index.js",
+  "scripts": {
+    "start": "python main.py",
+    "dev": "source venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["fastapi", "api", "backend", "python"],
+  "author": "",
+  "license": "ISC"
+}

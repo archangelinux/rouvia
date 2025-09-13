@@ -1,0 +1,17 @@
+{
+  "name": "rouvia",
+  "version": "1.0.0",
+  "description": "Rouvia - Full-stack application",
+  "private": true,
+  "scripts": {
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && source venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+    "build:client": "cd client && npm run build",
+    "build:server": "cd server && source venv/bin/activate && pip install -r requirements.txt",
+    "install:all": "cd client && npm install && cd ../server && source venv/bin/activate && pip install -r requirements.txt"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
