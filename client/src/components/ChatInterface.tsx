@@ -152,8 +152,7 @@ export default function ChatInterface() {
           const result = await res.json();
 
           // Flexible keys: transcript preferred; fallbacks for different server shapes
-          const transcript =
-            result.transcript || result.text || result.user_text || "";
+          const transcript = result.transcribed_text || "";
 
           if (transcript) {
             // Replace the placeholder with actual transcript so it looks like the user's message
@@ -164,8 +163,7 @@ export default function ChatInterface() {
           }
 
           // Optionally append an assistant/bot reply if provided
-          const botReply =
-            result.reply || result.response || result.message || "";
+          const botReply = result.message || "";
           if (botReply) {
             appendMessage({ text: String(botReply), role: "assistant" });
           }
