@@ -29,4 +29,4 @@ def plan_route(audio: UploadFile):
     route = route_optimizer.compute_route(stops)
     
     # 6. Return optimized route to frontend
-    return {route}
+    return {route} 
