@@ -6,7 +6,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 
 // const MAPBOX_TOKEN = process.env['NEXT_PUBLIC_MAPBOX_TOKEN'];
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN //'pk.eyJ1IjoiY2xhaXJlbGV1IiwiYSI6ImNtZmhyZHRpeTBlbTcybHB0Z2h0MWViaWwifQ.3WtsGrkviDv9WhvPkFGeKw';
+const MAPBOX_TOKEN = process.env['NEXT_PUBLIC_MAPBOX_TOKEN'];
 
 export default function MapboxMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -29,7 +29,7 @@ export default function MapboxMap() {
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [11.5761, 48.1374], // Munich coordinates (based on the image)
       zoom: 15,
-      pitch: 45, // 3D perspective
+      pitch: 60, // More dramatic 3D perspective
       bearing: 0,
       antialias: true
     });
@@ -41,9 +41,11 @@ export default function MapboxMap() {
 
     // Add some sample markers (based on the image)
     const markers = [
-      { name: 'Kik', coordinates: [11.5761, 48.1374], type: 'clothing' },
-      { name: 'Norma', coordinates: [11.5771, 48.1384], type: 'store' },
-      { name: 'zplatz', coordinates: [11.5751, 48.1364], type: 'location' }
+      { name: 'Kik', coordinates: [11.5761, 48.1374], type: 'clothing', icon: '👕' },
+      { name: 'Norma', coordinates: [11.5771, 48.1384], type: 'store', icon: '🛒' },
+      { name: 'Litzplatz', coordinates: [11.5751, 48.1364], type: 'park', icon: '🌳' },
+      { name: 'BMW Forschung und Technik GmbH', coordinates: [11.5781, 48.1394], type: 'building', icon: '🏢' },
+      { name: 'Georg-Brauchle-Ring', coordinates: [11.5741, 48.1354], type: 'landmark', icon: '🏛️' }
     ];
 
     markers.forEach(marker => {
@@ -51,27 +53,38 @@ export default function MapboxMap() {
       el.className = 'marker';
       el.style.cssText = `
         background-color: white;
-        width: 30px;
-        height: 30px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
-        border: 2px solid ${marker.type === 'location' ? '#10b981' : '#3b82f6'};
+        border: 2px solid ${marker.type === 'park' ? '#10b981' : '#3b82f6'};
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        font-size: 16px;
+        cursor: pointer;
+        transition: transform 0.2s ease;
       `;
 
-      // Add appropriate icon
-      const iconMap = {
-        clothing: '👕',
-        store: '🛒', 
-        location: '📍'
-      };
-      el.textContent = iconMap[marker.type as keyof typeof iconMap];
+      el.textContent = marker.icon;
 
-      new mapboxgl.Marker(el)
+      // Add hover effect
+      el.addEventListener('mouseenter', () => {
+        el.style.transform = 'scale(1.1)';
+      });
+      el.addEventListener('mouseleave', () => {
+        el.style.transform = 'scale(1)';
+      });
+
+      const markerInstance = new mapboxgl.Marker(el)
         .setLngLat(marker.coordinates as [number, number])
         .addTo(map.current!);
+
+      // Add popup with marker name
+      const popup = new mapboxgl.Popup({ offset: 25 })
+        .setHTML(`<div class="text-sm font-medium">${marker.name}</div>`);
+      
+      markerInstance.setPopup(popup);
     });
 
     return () => {
