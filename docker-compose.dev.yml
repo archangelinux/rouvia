@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: rouvia-frontend-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./client:/app
+      - /app/node_modules # Exclude node_modules from host mount
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: rouvia-backend-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server:/app
+      - /app/venv # Exclude venv from host mount
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: sh -c "source venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    restart: unless-stopped
+
+networks:
+  default:
+    driver: bridge
