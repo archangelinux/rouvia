@@ -131,7 +131,7 @@ def _build_payload(
     return payload
 
 
-def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
+def search_places_api(intent: Dict[str, Any]) -> List[PlaceCandidate]:
     """
     intent expects keys:
       - queries: List[str]  (or "categories")
@@ -215,11 +215,11 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
     return out
 
 
-# Backward compatibility wrapper for plan_route.py
-def search_compatibility(intent):
+def search(intent):
     """
     Search for places based on user intent.
-    This is a compatibility wrapper for the existing plan_route.py.
+    This is the main search function that provides compatibility with plan_route.py
+    and integrates with the new activity service.
     """
     try:
         from services.activity_service import fetch_google_places
@@ -242,7 +242,7 @@ def search_compatibility(intent):
         
         return candidates
     except ImportError:
-        # Fallback to the main search function if activity_service is not available
+        # Fallback to the Google Places API function if activity_service is not available
         # Convert PlaceCandidate objects to plain dicts for compatibility
-        place_candidates = search(intent)
+        place_candidates = search_places_api(intent)
         return [candidate.model_dump(by_alias=False) for candidate in place_candidates]

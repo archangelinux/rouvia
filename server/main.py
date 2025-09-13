@@ -72,7 +72,7 @@ class DebugIntent(BaseModel):
 @app.post("/debug/places", tags=["debug"])
 def debug_places(intent: DebugIntent):
     try:
-        results = google_places.search(intent.model_dump())
+        results = google_places.search_places_api(intent.model_dump())
         # return plain dicts for eyeballing
         return [r.model_dump(by_alias=False) for r in results]
     except Exception as e:
