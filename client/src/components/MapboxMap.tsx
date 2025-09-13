@@ -1,9 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
-
+import { useEffect, useRef } from "react";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 // const MAPBOX_TOKEN = process.env['NEXT_PUBLIC_MAPBOX_TOKEN'];
 const MAPBOX_TOKEN = process.env['NEXT_PUBLIC_MAPBOX_TOKEN'];
@@ -18,7 +17,7 @@ export default function MapboxMap() {
 
     // Check if we have a valid Mapbox token
     if (!MAPBOX_TOKEN) {
-      console.warn('Mapbox token is null');
+      console.warn("Mapbox token is null");
       return;
     }
 
@@ -26,18 +25,18 @@ export default function MapboxMap() {
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: "mapbox://styles/mapbox/streets-v12",
       center: [11.5761, 48.1374], // Munich coordinates (based on the image)
       zoom: 15,
       pitch: 60, // More dramatic 3D perspective
       bearing: 0,
-      antialias: true
+      antialias: true,
     });
 
     console.log("created new map");
 
     // Add navigation controls
-    map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    map.current.addControl(new mapboxgl.NavigationControl(), "bottom-right");
 
     // Add some sample markers (based on the image)
     const markers = [
@@ -48,9 +47,9 @@ export default function MapboxMap() {
       { name: 'Georg-Brauchle-Ring', coordinates: [11.5741, 48.1354], type: 'landmark', icon: '🏛️' }
     ];
 
-    markers.forEach(marker => {
-      const el = document.createElement('div');
-      el.className = 'marker';
+    markers.forEach((marker) => {
+      const el = document.createElement("div");
+      el.className = "marker";
       el.style.cssText = `
         background-color: white;
         width: 40px;
@@ -106,7 +105,7 @@ export default function MapboxMap() {
           <div className="absolute top-80 left-80 w-20 h-20 bg-gray-500 rounded-lg transform -rotate-6"></div>
           <div className="absolute top-32 left-120 w-36 h-36 bg-gray-400 rounded-lg transform rotate-12"></div>
         </div>
-        
+
         {/* Sample markers with proper styling */}
         <div className="absolute top-20 left-20 w-8 h-8 bg-white rounded-full border-2 border-blue-500 flex items-center justify-center text-sm shadow-lg">
           👕
@@ -117,7 +116,7 @@ export default function MapboxMap() {
         <div className="absolute top-60 left-40 w-8 h-8 bg-white rounded-full border-2 border-green-500 flex items-center justify-center text-sm shadow-lg">
           📍
         </div>
-        
+
         {/* Map controls */}
         <div className="absolute bottom-4 right-4 flex flex-col space-y-2">
           <button className="w-10 h-10 bg-white rounded shadow-lg flex items-center justify-center text-gray-600 hover:bg-gray-50">

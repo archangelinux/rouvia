@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useRef, useEffect } from 'react';
 import { Mic, Send, MessageCircle, Settings } from 'lucide-react';
@@ -26,17 +26,19 @@ function getUserLocation(): Promise<{ latitude: number; longitude: number }> {
 }
 
 export default function ChatInterface() {
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<'chat' | 'filters'>('chat');
 
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
+    null
+  );
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -53,32 +55,32 @@ export default function ChatInterface() {
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, newMessage]);
-    setMessage('');
+    setMessages((prev) => [...prev, newMessage]);
+    setMessage("");
 
     // Get user location
     const location = await getUserLocation(); // { latitude, longitude }
-    console.log('User location:', location.latitude, location.longitude);
+    console.log("User location:", location.latitude, location.longitude);
 
     // Add location to the payload
     const payload = {
       ...newMessage,
       location, // attach location
     };
-    
-    console.log({newMessage})
 
-     try {
-      const res = await fetch('http://localhost:8000/plan-route-audio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+    console.log({ newMessage });
+
+    try {
+      const res = await fetch("http://localhost:8000/plan-route-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       const result = await res.json();
-      console.log('Server response:', result);
-      } catch (err) {
-      console.error('Failed to send message:', err);
+      console.log("Server response:", result);
+    } catch (err) {
+      console.error("Failed to send message:", err);
     }
   };
 
@@ -89,51 +91,50 @@ export default function ChatInterface() {
       const recorder = new MediaRecorder(stream);
 
       recorder.ondataavailable = (e) => {
-        setAudioChunks(prev => [...prev, e.data]);
+        setAudioChunks((prev) => [...prev, e.data]);
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
         setAudioChunks([]);
 
-         // Get user location
+        // Get user location
         let location;
         try {
           location = await getUserLocation();
-          console.log('User location:', location.latitude, location.longitude);
+          console.log("User location:", location.latitude, location.longitude);
         } catch (err) {
-          console.error('Failed to get location:', err);
+          console.error("Failed to get location:", err);
           location = null;
         }
 
         // Create a unique filename with timestamp
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
         const filename = `voice-${timestamp}.wav`;
 
         // Send to backend
         const formData = new FormData();
-        formData.append('audio', audioBlob, filename);
+        formData.append("audio", audioBlob, filename);
 
         if (location) {
-          formData.append('location', JSON.stringify(location));
+          formData.append("location", JSON.stringify(location));
         }
 
         try {
-          const res = await fetch('http://localhost:8000/plan-route-audio', {
-            method: 'POST',
+          const res = await fetch("http://localhost:8000/plan-route-audio", {
+            method: "POST",
             body: formData,
           });
           const result = await res.json();
-          console.log('Server response:', result);
+          console.log("Server response:", result);
         } catch (err) {
-          console.error('Failed to send audio:', err);
+          console.error("Failed to send audio:", err);
         }
       };
 
       recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
-
     } else {
       // Stop recording
       mediaRecorder?.stop();
