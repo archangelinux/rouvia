@@ -165,7 +165,7 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
         # e.g., "best ice cream near me", "scenic lookout near me"
         text_query = q
         if lat is not None and lng is not None:
-            # “near me” tends to work well with a location bias
+            # "near me" tends to work well with a location bias
             text_query = f"best {q} near me"
 
         payload = _build_payload(text_query, lat, lng, radius_m, open_now)
@@ -213,3 +213,36 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
     # primary: rating desc, secondary: user_ratings_total desc
     out.sort(key=lambda c: ((c.rating or 0), (c.user_ratings_total or 0)), reverse=True)
     return out
+
+
+# Backward compatibility wrapper for plan_route.py
+def search_compatibility(intent):
+    """
+    Search for places based on user intent.
+    This is a compatibility wrapper for the existing plan_route.py.
+    """
+    try:
+        from services.activity_service import fetch_google_places
+        
+        # Extract location from intent (default to Waterloo if not provided)
+        location = intent.get("location", {"lat": 43.4643, "lon": -80.5204})
+        
+        # Fetch places using the existing activity service
+        places = fetch_google_places(location["lat"], location["lon"])
+        
+        # Transform to the format expected by plan_route.py
+        candidates = []
+        for place in places:
+            if "structured" in place:
+                candidate = place["structured"].copy()
+                # Ensure we have the required fields
+                if "name" not in candidate and "title" in candidate:
+                    candidate["name"] = candidate["title"]
+                candidates.append(candidate)
+        
+        return candidates
+    except ImportError:
+        # Fallback to the main search function if activity_service is not available
+        # Convert PlaceCandidate objects to plain dicts for compatibility
+        place_candidates = search(intent)
+        return [candidate.model_dump(by_alias=False) for candidate in place_candidates]

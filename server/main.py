@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import datetime
 import uvicorn
-from routers import plan_route_audio
+from routers import plan_route_audio, sidequest
 from services import google_places  # ← now this sees the env var loaded above
 
 app = FastAPI(
@@ -55,8 +55,8 @@ async def health_check():
         "status": "healthy",
     }
 
-
 app.include_router(plan_route_audio.router, prefix="", tags=["plan_route"])
+app.include_router(sidequest.router, prefix="/sidequest", tags=["sidequest"])
 
 
 class DebugIntent(BaseModel):
