@@ -4,9 +4,10 @@ import tempfile
 import os
 
 # Set up OpenAI client with API key from environment
-client = openai.OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
+api_key = os.getenv("OPENAI_API_KEY")
+client = None
+if api_key:
+    client = openai.OpenAI(api_key=api_key)
 
 def transcribe(audio_file: UploadFile) -> str:
     """
@@ -18,6 +19,12 @@ def transcribe(audio_file: UploadFile) -> str:
     Returns:
         str: Transcribed text
     """
+    if not client:
+        raise HTTPException(
+            status_code=500,
+            detail="OpenAI API key not configured. Please set OPENAI_API_KEY environment variable."
+        )
+    
     try:
         # Create a temporary file to store the uploaded audio
         with tempfile.NamedTemporaryFile(delete=False, suffix=".tmp") as temp_file:

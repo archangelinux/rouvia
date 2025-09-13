@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any
 import datetime
 import uvicorn
-from server.routers import plan_route
+from routers import plan_route, sidequest
 
 app = FastAPI(
     title="Rouvia API",
@@ -43,6 +43,8 @@ async def health_check():
     }
 
 app.include_router(plan_route.router, prefix="", tags=["plan_route"])
+app.include_router(sidequest.router, prefix="/sidequest", tags=["sidequest"])
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
