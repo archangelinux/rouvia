@@ -18,6 +18,8 @@ services:
     build:
       context: .
       dockerfile: server/Dockerfile.dev
+    env_file:
+      - ./server/.env
     container_name: rouvia-backend-dev
     ports:
       - "8000:8000"

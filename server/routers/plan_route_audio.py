@@ -6,15 +6,15 @@
 # finally we send the route to the frontend for mapbox to render
 
 from fastapi import APIRouter, HTTPException, status, UploadFile
-from schemas.plan_route import GoogleDirectionsResponse
-from services import whisper_service, llm_service, google_places, route_optimizer
+from server.schemas.plan_route_audio import GoogleDirectionsResponse
+from services import speech_to_text
 
 router = APIRouter()
 
-@router.post("/plan-route", response_model=GoogleDirectionsResponse)
+@router.post("/plan-route-audio", response_model=GoogleDirectionsResponse)
 def plan_route(audio: UploadFile):
     # 1. Transcribe audio
-    text = whisper_service.transcribe(audio)
+    text = speech_to_text.transcribe(audio)
     
     # 2. Parse intent with LLM
     intent = llm_service.parse_intent(text)
@@ -29,4 +29,4 @@ def plan_route(audio: UploadFile):
     route = route_optimizer.compute_route(stops)
     
     # 6. Return optimized route to frontend
-    return {"route": route, "stops": stops}
+    return {route}
