@@ -3,22 +3,20 @@
 import { useState, useRef, useEffect } from "react";
 import { Mic, Send, MessageCircle, Settings } from "lucide-react";
 import FilterPanel from "./FilterPanel";
+import { useRoute, type PlaceStop } from "@/components/context/route-context";
 
 interface ChatMessage {
   id: string;
   text: string;
   timestamp: Date;
-  // Optional role to style in future (user/assistant/system)
   role?: "user" | "assistant" | "system";
 }
 
 function getUserLocation(): Promise<{ latitude: number; longitude: number }> {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        resolve({ latitude, longitude });
-      },
+      ({ coords }) =>
+        resolve({ latitude: coords.latitude, longitude: coords.longitude }),
       (error) => reject(error),
       { enableHighAccuracy: true }
     );
@@ -26,6 +24,8 @@ function getUserLocation(): Promise<{ latitude: number; longitude: number }> {
 }
 
 export default function ChatInterface() {
+  const { setStops, setWaypoints, setUserLocation } = useRoute();
+
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -37,7 +37,8 @@ export default function ChatInterface() {
   );
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
 
-  const API_URL = "http://localhost:8000/plan-route-audio";
+  const API_URL_AUDIO = "http://localhost:8000/plan-route-audio";
+  const API_URL_TEXT = "http://localhost:8000/plan-route-text";
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,43 +64,53 @@ export default function ChatInterface() {
     );
   };
 
+  const pushStopsToContext = (stops: PlaceStop[] | unknown) => {
+    if (!Array.isArray(stops)) return;
+    const typed = stops as PlaceStop[];
+    setStops(typed);
+    // Mapbox expects [lng, lat]
+    setWaypoints(typed.map((s) => [s.lng, s.lat] as [number, number]));
+  };
+
+  // Typed message -> POST /plan-route-text (JSON)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
 
-    // Show the user's typed message immediately
     appendMessage({ text: message.trim(), role: "user" });
     const outbound = message.trim();
     setMessage("");
 
-    // Attach location and send as JSON
     let location: { latitude: number; longitude: number } | null = null;
     try {
       location = await getUserLocation();
-    } catch (err) {
-      console.warn("Location unavailable:", err);
+      if (location) setUserLocation(location);
+    } catch {
+      /* optional */
     }
 
     const payload = {
       text: outbound,
-      timestamp: new Date().toISOString(),
-      location,
+      // backend accepts {latitude, longitude} OR {lat, lng}
+      location: location
+        ? { latitude: location.latitude, longitude: location.longitude }
+        : null,
     };
 
     try {
-      const res = await fetch(API_URL, {
+      const res = await fetch(API_URL_TEXT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const result = await res.json();
 
-      // If your API returns a bot reply, show it
+      pushStopsToContext(result.stops);
+
       const botReply =
         result.reply || result.response || result.message || result.text;
-      if (botReply) {
+      if (botReply)
         appendMessage({ text: String(botReply), role: "assistant" });
-      }
     } catch (err) {
       appendMessage({
         text: "⚠️ Failed to send message to server.",
@@ -109,66 +120,57 @@ export default function ChatInterface() {
     }
   };
 
+  // Voice -> POST /plan-route-audio (multipart/form-data)
   const handleVoiceClick = async () => {
     if (!isRecording) {
-      // Start recording
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
 
-      recorder.ondataavailable = (e) => {
+      recorder.ondataavailable = (e) =>
         setAudioChunks((prev) => [...prev, e.data]);
-      };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+        const blob = new Blob(audioChunks, { type: "audio/wav" });
         setAudioChunks([]);
 
-        // Show a temporary placeholder in the chat while we transcribe
         const placeholderId = appendMessage({
           text: "🎙️ Transcribing…",
           role: "user",
         });
 
-        // Try to get location (optional)
         let location: { latitude: number; longitude: number } | null = null;
         try {
           location = await getUserLocation();
-        } catch (err) {
-          console.warn("Location unavailable:", err);
+          if (location) setUserLocation(location);
+        } catch {
+          /* optional */
         }
 
-        // Create a unique filename and send to backend
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
         const filename = `voice-${timestamp}.wav`;
 
         const formData = new FormData();
-        formData.append("audio", audioBlob, filename);
-        if (location) {
-          formData.append("location", JSON.stringify(location));
-        }
+        formData.append("audio", blob, filename);
+        if (location) formData.append("location", JSON.stringify(location));
 
         try {
-          const res = await fetch(API_URL, { method: "POST", body: formData });
+          const res = await fetch(API_URL_AUDIO, {
+            method: "POST",
+            body: formData,
+          });
           const result = await res.json();
 
-          // Flexible keys: transcript preferred; fallbacks for different server shapes
-          const transcript = result.transcribed_text || "";
+          const transcript: string = result.transcribed_text || "";
+          replaceMessageText(
+            placeholderId,
+            transcript || "🎙️ (No transcript returned)"
+          );
 
-          if (transcript) {
-            // Replace the placeholder with actual transcript so it looks like the user's message
-            replaceMessageText(placeholderId, String(transcript));
-          } else {
-            // If server returns no transcript, keep placeholder but indicate issue
-            replaceMessageText(placeholderId, "🎙️ (No transcript returned)");
-          }
+          pushStopsToContext(result.stops);
 
-          // Optionally append an assistant/bot reply if provided
-          const botReply = result.message || "";
-          if (botReply) {
-            appendMessage({ text: String(botReply), role: "assistant" });
-          }
+          const botReply: string = result.message || "";
+          if (botReply) appendMessage({ text: botReply, role: "assistant" });
         } catch (err) {
-          // Replace placeholder with error
           replaceMessageText(
             placeholderId,
             "⚠️ Transcription failed. Please try again."
@@ -181,8 +183,10 @@ export default function ChatInterface() {
       setMediaRecorder(recorder);
       setIsRecording(true);
     } else {
-      // Stop recording
-      mediaRecorder?.stop();
+      // Stop recording if active
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+      }
       setIsRecording(false);
     }
   };
