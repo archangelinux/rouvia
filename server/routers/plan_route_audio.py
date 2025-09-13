@@ -24,6 +24,7 @@ os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
 
 # ...existing code...
 
+
 @router.post("/plan-route-audio")
 async def plan_route(input: GoogleDirectionsRequest):
     try:
@@ -31,20 +32,16 @@ async def plan_route(input: GoogleDirectionsRequest):
         filename = input.audio_file_path
         start_lat = input.starting_location.lat
         start_lng = input.starting_location.lng
-        
+
         if not filename:
-            raise HTTPException(
-                status_code=400,
-                detail="Audio file path is required"
-            )
+            raise HTTPException(status_code=400, detail="Audio file path is required")
 
         file_path = os.path.join(AUDIO_FILES_DIR, filename)
-        
+
         # Check if file exists
         if not os.path.exists(file_path):
             raise HTTPException(
-                status_code=404,
-                detail=f"Audio file not found: {filename}"
+                status_code=404, detail=f"Audio file not found: {filename}"
             )
 
         print(f"Processing audio file: {file_path}")
@@ -54,7 +51,7 @@ async def plan_route(input: GoogleDirectionsRequest):
         with open(file_path, "rb") as f:
             upload_file = UploadFile(filename=filename, file=f)
             text = speech_to_text.transcribe(upload_file)
-        
+
         print(f"Transcribed text: {text}")
 
         # 2. Parse intent with LLM
@@ -68,7 +65,7 @@ async def plan_route(input: GoogleDirectionsRequest):
             "categories": intent.get("place_types", []),
             "lat": start_lat,
             "lng": start_lng,
-            "radius_m": intent.get("search_radius_meters", 10000)
+            "radius_m": intent.get("search_radius_meters", 10000),
         }
         print(f"Places API intent: {places_intent}")
 
@@ -85,7 +82,7 @@ async def plan_route(input: GoogleDirectionsRequest):
             stops=stops,
             status="success",
             transcribed_text=text,
-            message=f"Found {len(stops)} stops for your route"
+            message=f"Found {len(stops)} stops for your route",
         )
 
     except Exception as e:
@@ -94,6 +91,7 @@ async def plan_route(input: GoogleDirectionsRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing audio file: {str(e)}",
         )
+
 
 if __name__ == "__main__":
     import asyncio
@@ -128,19 +126,23 @@ if __name__ == "__main__":
 
             try:
                 print("🔄 Starting route planning...")
-                
+
                 # Create a test request object
                 from schemas.plan_route_audio import Location
+
                 test_request = GoogleDirectionsRequest(
                     audio_file_path="example_audio.wav",
-                    starting_location=Location(lat=43.472135467199074, lng=-80.54468594453151)  # Waterloo coords
+                    starting_location=Location(
+                        lat=43.472135467199074, lng=-80.54468594453151
+                    ),  # Waterloo coords
                 )
-                
+
                 # Copy the example file to the expected location
                 import shutil
+
                 target_path = os.path.join(AUDIO_FILES_DIR, "example_audio.wav")
                 shutil.copy2(example_file, target_path)
-                
+
                 result = await plan_route(test_request)
 
                 if result:
@@ -148,6 +150,7 @@ if __name__ == "__main__":
                     print(f"📝 Result: {result}")
 
                     import json
+
                     json_result = result.model_dump()  # Convert Pydantic model to dict
                     print(f"\n🔧 JSON Output:")
                     print(json.dumps(json_result, indent=2))
@@ -158,7 +161,9 @@ if __name__ == "__main__":
                 print(f"❌ Error during route planning: {str(e)}")
                 traceback.print_exc()
         else:
-            print("❌ Example audio file not found. Please provide a valid audio file to test.")
+            print(
+                "❌ Example audio file not found. Please provide a valid audio file to test."
+            )
 
     # Run the async test
     asyncio.run(test_route_planning())
