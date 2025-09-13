@@ -7,8 +7,8 @@
 
 import os
 from fastapi import APIRouter, HTTPException, status, UploadFile, File
-from server.schemas.plan_route_audio import GoogleDirectionsResponse
-from services import speech_to_text
+from schemas.plan_route_audio import GoogleDirectionsResponse
+from services import speech_to_text, llm_service
 from fastapi.responses import JSONResponse
 import shutil
 from datetime import datetime
@@ -23,7 +23,7 @@ AUDIO_FILES_DIR = "audiofiles"
 os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
 
 @router.post("/plan-route-audio", response_model=GoogleDirectionsResponse)
-async def plan_route(audio: UploadFile = File(...)):
+async def plan_route(audio: UploadFile = File(...), location: JSONResponse = None):
     try:
         # Use the filename sent from the frontend
         filename = audio.filename
