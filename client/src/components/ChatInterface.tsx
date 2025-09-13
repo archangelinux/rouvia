@@ -10,7 +10,7 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-function getUserLocation(): Promise<{ latitude: number; longitude: number }> {
+async function getUserLocation(): Promise<{ latitude: number; longitude: number }> {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -174,7 +174,7 @@ export default function ChatInterface() {
       {mode === 'chat' ? (
         <>
           {/* Messages Container */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+          <div className="max-h-100 overflow-y-auto p-4 space-y-3 min-h-0">
             {messages.map((msg, index) => {
               const isRecent = index >= messages.length - 3;
               const opacity = isRecent ? 1 : Math.max(0.3, 1 - (messages.length - index) * 0.1);
@@ -182,22 +182,24 @@ export default function ChatInterface() {
               return (
                 <div
                   key={msg.id}
-                  className="animate-fade-in-left"
+                  className="flex justify-end animate-fade-in-left"
                   style={{ opacity }}
                 >
-                  <div className="text-gray-800 text-base leading-relaxed font-light">
-                    {msg.text.split('').map((char, charIndex) => (
-                      <span
-                        key={charIndex}
-                        className="animate-char-fade-in"
-                        style={{ 
-                          animationDelay: `${charIndex * 0.02}s`,
-                          animationFillMode: 'both'
-                        }}
-                      >
-                        {char}
-                      </span>
-                    ))}
+                  <div className="bg-gray-200 rounded-lg px-4 py-2 max-w-[80%] break-words">
+                    <div className="text-gray-800 text-sm leading-relaxed font-light whitespace-pre-wrap break-words">
+                      {msg.text.split('').map((char, charIndex) => (
+                        <span
+                          key={charIndex}
+                          className="animate-char-fade-in"
+                          style={{ 
+                            animationDelay: `${charIndex * 0.02}s`,
+                            animationFillMode: 'both'
+                          }}
+                        >
+                          {char}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               );

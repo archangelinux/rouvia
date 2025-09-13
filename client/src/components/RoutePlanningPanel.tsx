@@ -42,7 +42,7 @@ export default function RoutePlanningPanel() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 max-h-[60vh] overflow-y-auto">
+    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 max-h-[52vh] overflow-y-auto">
       {/* Route Line with Stops */}
       <div className="relative mb-6">
         <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-green-500"></div>
