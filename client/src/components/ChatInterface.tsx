@@ -9,10 +9,29 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+function getUserLocation(): Promise<{ latitude: number; longitude: number }> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        resolve({ latitude, longitude });
+      },
+      (error) => {
+        reject(error);
+      },
+      { enableHighAccuracy: true }
+    );
+  });
+}
+
 export default function ChatInterface() {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -34,18 +53,89 @@ export default function ChatInterface() {
 
     setMessages(prev => [...prev, newMessage]);
     setMessage('');
+
+    // Get user location
+    const location = await getUserLocation(); // { latitude, longitude }
+    console.log('User location:', location.latitude, location.longitude);
+
+    // Add location to the payload
+    const payload = {
+      ...newMessage,
+      location, // attach location
+    };
     
+    console.log({newMessage})
+
      try {
-      const res = await fetch('/api/messages', {
+      const res = await fetch('http://localhost:8000/plan-route-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newMessage),
+        body: JSON.stringify(payload),
       });
 
       const result = await res.json();
       console.log('Server response:', result);
       } catch (err) {
       console.error('Failed to send message:', err);
+    }
+  };
+
+  const handleVoiceClick = async () => {
+    if (!isRecording) {
+      // Start recording
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+
+      recorder.ondataavailable = (e) => {
+        setAudioChunks(prev => [...prev, e.data]);
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        setAudioChunks([]);
+
+         // Get user location
+        let location;
+        try {
+          location = await getUserLocation();
+          console.log('User location:', location.latitude, location.longitude);
+        } catch (err) {
+          console.error('Failed to get location:', err);
+          location = null;
+        }
+
+        // Create a unique filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `voice-${timestamp}.wav`;
+
+        // Send to backend
+        const formData = new FormData();
+        formData.append('audio', audioBlob, filename);
+
+        if (location) {
+          formData.append('location', JSON.stringify(location));
+        }
+
+        try {
+          const res = await fetch('http://localhost:8000/plan-route-audio', {
+            method: 'POST',
+            body: formData,
+          });
+          const result = await res.json();
+          console.log('Server response:', result);
+        } catch (err) {
+          console.error('Failed to send audio:', err);
+        }
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+
+    } else {
+      // Stop recording
+      mediaRecorder?.stop();
+      setIsRecording(false);
     }
   };
 
@@ -98,8 +188,11 @@ export default function ChatInterface() {
           {/* Voice Input Button */}
           <button
             type="button"
-            className="rounded-full w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-colors duration-150"
-            title="Voice input"
+            onClick={handleVoiceClick}
+            className={`rounded-full w-10 h-10 flex items-center justify-center transition-colors duration-150 ${
+              isRecording ? 'bg-red-500 text-white' : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            title={isRecording ? 'Stop recording' : 'Voice input'}
           >
             <Mic size={18} />
           </button>

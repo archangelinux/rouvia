@@ -6,7 +6,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 
 // const MAPBOX_TOKEN = process.env['NEXT_PUBLIC_MAPBOX_TOKEN'];
-const MAPBOX_TOKEN = process.env[NEXT_PUBLIC_MAPBOX_TOKEN];
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN //'pk.eyJ1IjoiY2xhaXJlbGV1IiwiYSI6ImNtZmhyZHRpeTBlbTcybHB0Z2h0MWViaWwifQ.3WtsGrkviDv9WhvPkFGeKw';
 
 export default function MapboxMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
