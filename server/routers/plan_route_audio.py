@@ -7,7 +7,7 @@
 
 import os
 from fastapi import APIRouter, HTTPException, status, UploadFile, File
-from server.schemas.plan_route_audio import GoogleDirectionsResponse
+from schemas.plan_route_audio import GoogleDirectionsResponse
 from services import speech_to_text
 from fastapi.responses import JSONResponse
 import shutil
