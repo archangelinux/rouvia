@@ -1,7 +1,7 @@
 import os
 import time
 import requests
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 from pydantic import BaseModel, Field
 
 GOOGLE_PLACES_SEARCH_TEXT_URL = "https://places.googleapis.com/v1/places:searchText"
@@ -109,7 +109,7 @@ def _build_payload(
     text_query: str,
     lat: Optional[float],
     lng: Optional[float],
-    radius_m: Optional[int | float | str],
+    radius_m: Optional[Union[int, float, str]],
     open_now: Optional[bool],
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
