@@ -1,7 +1,7 @@
 import os
 import time
 import requests
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 from pydantic import BaseModel, Field
 
 GOOGLE_PLACES_SEARCH_TEXT_URL = "https://places.googleapis.com/v1/places:searchText"
@@ -109,7 +109,7 @@ def _build_payload(
     text_query: str,
     lat: Optional[float],
     lng: Optional[float],
-    radius_m: Optional[int | float | str],
+    radius_m: Optional[Union[int, float, str]],
     open_now: Optional[bool],
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
@@ -130,6 +130,7 @@ def _build_payload(
         }
     return payload
 
+# ...existing code...
 
 def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
     """
@@ -150,7 +151,15 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
     radius_m = intent.get("radius_m", None)
     open_now = intent.get("open_now", None)
     min_rating = intent.get("min_rating", None)
-    max_results = int(intent.get("max_results", 40))
+    max_results = int(intent.get("max_results", 60))  # Increased to allow all queries
+    results_per_query = max(10, max_results // len(queries))  # Distribute results across queries
+
+    print(f"🔍 Google Places Search Debug:")
+    print(f"   Queries: {queries}")
+    print(f"   Location: {lat}, {lng}")
+    print(f"   Radius: {radius_m}m")
+    print(f"   Max results: {max_results}")
+    print(f"   Results per query: {results_per_query}")
 
     if not queries:
         raise ValueError(
@@ -161,21 +170,27 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
     out: List[PlaceCandidate] = []
 
     for q in queries:
+        print(f"\n🔎 Searching for: '{q}'")
+        
         # Make the query human-like to improve text search quality
-        # e.g., "best ice cream near me", "scenic lookout near me"
         text_query = q
         if lat is not None and lng is not None:
-            # “near me” tends to work well with a location bias
+            # "near me" tends to work well with a location bias
             text_query = f"best {q} near me"
 
+        print(f"   Text query: '{text_query}'")
         payload = _build_payload(text_query, lat, lng, radius_m, open_now)
 
-        # paginate until we hit our cap or no nextPageToken
+        # paginate until we hit our cap per query or no nextPageToken
         page_token = None
-        while True:
+        query_results = 0
+        while query_results < results_per_query:  # Limit per query, not total
             if page_token:
                 payload["pageToken"] = page_token
             data = _search_text_page(payload)
+
+            places_in_page = len(data.get("places", []))
+            print(f"   📄 Page returned {places_in_page} places")
 
             for p in data.get("places", []):
                 pid = p.get("id")
@@ -183,20 +198,25 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
                     continue
                 cand = PlaceCandidate.from_api(p)
 
+                # Print each candidate
+                print(f"   📍 {cand.name} - Types: {cand.types} - Rating: {cand.rating}")
+
                 # filter by rating if configured
                 if (
                     (min_rating is not None)
                     and (cand.rating is not None)
                     and (cand.rating < float(min_rating))
                 ):
+                    print(f"      ❌ Filtered out (rating {cand.rating} < {min_rating})")
                     continue
 
                 out.append(cand)
                 seen.add(pid)
-                if len(out) >= max_results:
+                query_results += 1
+                if query_results >= results_per_query:
                     break
 
-            if len(out) >= max_results:
+            if query_results >= results_per_query:
                 break
 
             page_token = data.get("nextPageToken")
@@ -206,8 +226,19 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
             # tiny pause; nextPageToken sometimes needs a moment before it becomes valid
             time.sleep(0.5)
 
-        if len(out) >= max_results:
-            break
+        print(f"   ✅ Found {query_results} results for '{q}'")
+
+    print(f"\n📊 Total candidates found: {len(out)}")
+    
+    # Group by type for summary
+    type_counts = {}
+    for cand in out:
+        for place_type in cand.types:
+            type_counts[place_type] = type_counts.get(place_type, 0) + 1
+    
+    print(f"📈 Candidates by type:")
+    for ptype, count in sorted(type_counts.items()):
+        print(f"   {ptype}: {count}")
 
     # Sort results to make LLM selection easier:
     # primary: rating desc, secondary: user_ratings_total desc

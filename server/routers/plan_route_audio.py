@@ -1,21 +1,17 @@
-# first we ask whisper to transcribe voice input
-# then we send the transcription to gemini for types of places to search on google places
-# then we use the places to give to google maps to get a list of locations (set center point as middle between 2 points, get all pois in radius)
-# then we send the list of locations to gemini to rank them and give a final json to give to gemini for routing
-# then we send the final json to google places to get a route
-# finally we send the route to the frontend for mapbox to render
+# routers/plan_route_audio.py
+# Accepts multipart audio uploads (for voice) and a JSON text route (for typed input)
 
 import os
-from fastapi import APIRouter, HTTPException, status, UploadFile, File
-from schemas.plan_route_audio import GoogleDirectionsResponse
-from services import speech_to_text, llm_service
-from fastapi.responses import JSONResponse
-import shutil
-from datetime import datetime
+import json
 import uuid
+import shutil
+from typing import Any, Dict, Optional, Tuple
 
-# Import your services (uncomment when you have these implemented)
-# from services import llm_service, google_places, route_optimizer
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
+from pydantic import BaseModel
+
+from schemas.plan_route_audio import PlanRouteAudioResponse
+from services import speech_to_text, llm_service, google_places
 
 router = APIRouter()
 
@@ -23,45 +19,164 @@ AUDIO_FILES_DIR = "audiofiles"
 os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
 
 
-@router.post("/plan-route-audio", response_model=GoogleDirectionsResponse)
-async def plan_route(audio: UploadFile = File(...), location: JSONResponse = None):
+# -----------------------------
+# Helpers
+# -----------------------------
+def _parse_location_json(
+    location_str: Optional[str],
+) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Accepts a JSON string or None. Supports keys:
+    - { latitude, longitude }  (frontend browser geolocation)
+    - { lat, lng }             (alt form)
+    Returns (lat, lng) as floats or (None, None).
+    """
+    if not location_str:
+        return None, None
     try:
-        # Use the filename sent from the frontend
-        filename = audio.filename
-        if not filename:
-            # Fallback if no filename provided
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            unique_id = str(uuid.uuid4())[:8]
-            filename = f"voice_{timestamp}_{unique_id}.wav"
+        payload = json.loads(location_str)
+    except json.JSONDecodeError:
+        return None, None
 
-        file_path = os.path.join(AUDIO_FILES_DIR, filename)
+    lat = payload.get("lat")
+    if lat is None:
+        lat = payload.get("latitude")
 
-        # Save the audio file
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(audio.file, buffer)
+    lng = payload.get("lng")
+    if lng is None:
+        lng = payload.get("longitude")
 
-        print(f"Audio file saved: {file_path}")
+    try:
+        return (
+            float(lat) if lat is not None else None,
+            float(lng) if lng is not None else None,
+        )
+    except (TypeError, ValueError):
+        return None, None
 
-        # 1. Transcribe audio - pass the file path instead of UploadFile object
-        text = speech_to_text.transcribe(file_path)
 
-        # 2. Parse intent with LLM
-        intent = llm_service.parse_intent(text)
+def _build_places_intent(
+    intent: Dict[str, Any], lat: Optional[float], lng: Optional[float]
+) -> Dict[str, Any]:
+    return {
+        "queries": intent.get("place_types", []),
+        "categories": intent.get("place_types", []),
+        "lat": lat,
+        "lng": lng,
+        "radius_m": intent.get("search_radius_meters", 10_000),
+    }
 
-        # 3. Get candidate places from Google Places API
-        candidates = google_places.search(intent)
 
-        # 4. LLM selects actual stops
-        stops = llm_service.select_stops(intent, candidates)
+def _pipeline_from_text(
+    text: str, lat: Optional[float], lng: Optional[float]
+) -> PlanRouteAudioResponse:
+    """
+    Shared pipeline: parse intent -> search places -> select stops -> build response.
+    """
+    starting_location = (
+        f"latitude:{lat},longitude:{lng}"
+        if (lat is not None and lng is not None)
+        else None
+    )
 
-        # 5. Optimize route
-        route = route_optimizer.compute_route(stops)
+    # 2) LLM parse intent
+    intent = llm_service.parse_intent(starting_location, text)
 
-        # 6. Return optimized route to frontend
-        return route
+    # 3) Places intent
+    places_intent = _build_places_intent(intent, lat, lng)
 
+    # 4) Google Places candidates
+    candidates = google_places.search(places_intent)
+
+    # 5) LLM selects actual stops
+    stops = llm_service.select_stops(intent, candidates)
+
+    # 6) Response
+    return PlanRouteAudioResponse(
+        stops=stops,
+        status="success",
+        transcribed_text=text,
+        message=f"Found {len(stops)} stops for your route",
+    )
+
+
+# -----------------------------
+# 1) Voice route: multipart/form-data
+# -----------------------------
+@router.post("/plan-route-audio", response_model=PlanRouteAudioResponse)
+async def plan_route_audio(
+    audio: UploadFile = File(...),  # matches your FormData key "audio"
+    location: Optional[str] = Form(
+        None
+    ),  # optional JSON string {"latitude":..., "longitude":...}
+):
+    """
+    Accepts an audio file upload and optional location JSON.
+    Saves the file, transcribes with Whisper, runs intent->places->stops pipeline, returns final response.
+    """
+    try:
+        # Persist uploaded audio to disk
+        _, ext = os.path.splitext(audio.filename or "")
+        ext = ext or ".wav"
+        saved_name = f"{uuid.uuid4()}{ext}"
+        saved_path = os.path.join(AUDIO_FILES_DIR, saved_name)
+
+        with open(saved_path, "wb") as f:
+            shutil.copyfileobj(audio.file, f)
+
+        # Parse optional location
+        lat, lng = _parse_location_json(location)
+
+        # 1) Transcribe
+        with open(saved_path, "rb") as f:
+            upload = UploadFile(
+                filename=saved_name, file=f
+            )  # keep existing transcribe signature
+            text = speech_to_text.transcribe(upload)
+
+        # Run the shared pipeline from transcribed text
+        return _pipeline_from_text(text=text, lat=lat, lng=lng)
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing audio file: {str(e)}",
+            detail=f"Error processing audio upload: {e}",
+        )
+
+
+# -----------------------------
+# 2) Text route: application/json (for typed chat)
+# -----------------------------
+class PlanRouteTextRequest(BaseModel):
+    text: str
+    location: Optional[Dict[str, Any]] = (
+        None  # supports {latitude, longitude} or {lat, lng}
+    )
+
+
+@router.post("/plan-route-text", response_model=PlanRouteAudioResponse)
+async def plan_route_text(payload: PlanRouteTextRequest):
+    """
+    Accepts typed text + optional location JSON via application/json.
+    Runs the same pipeline used by the audio route (skipping transcription).
+    """
+    try:
+        lat = None
+        lng = None
+        if payload.location:
+            lat = payload.location.get("lat") or payload.location.get("latitude")
+            lng = payload.location.get("lng") or payload.location.get("longitude")
+            lat = float(lat) if lat is not None else None
+            lng = float(lng) if lng is not None else None
+
+        return _pipeline_from_text(text=payload.text, lat=lat, lng=lng)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing text route: {e}",
         )
