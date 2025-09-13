@@ -2,119 +2,163 @@
 
 import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
+import type { LineString } from "geojson";
 import "mapbox-gl/dist/mapbox-gl.css";
 
-// const MAPBOX_TOKEN = process.env['NEXT_PUBLIC_MAPBOX_TOKEN'];
 const MAPBOX_TOKEN =
-  "pk.eyJ1IjoiY2xhaXJlbGV1IiwiYSI6ImNtZmhyZHRpeTBlbTcybHB0Z2h0MWViaWwifQ.3WtsGrkviDv9WhvPkFGeKw";
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "YOUR_MAPBOX_TOKEN_HERE";
+
+function buildDirectionsUrl(
+  profile: "driving" | "walking" | "cycling",
+  coords: [number, number][]
+): string {
+  const path = coords.map(([lon, lat]) => `${lon},${lat}`).join(";");
+  const params = new URLSearchParams({
+    geometries: "geojson",
+    steps: "true",
+    overview: "full",
+    access_token: MAPBOX_TOKEN!,
+  });
+  return `https://api.mapbox.com/directions/v5/mapbox/${profile}/${path}?${params.toString()}`;
+}
+
+declare global {
+  interface Window {
+    __routeMarkers?: mapboxgl.Marker[];
+  }
+}
 
 export default function MapboxMap() {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
 
   useEffect(() => {
-    //if (map.current) return; // Initialize map only once
-    if (!mapContainer.current) return; // checks the div is rendered
-
-    // Check if we have a valid Mapbox token
-    if (!MAPBOX_TOKEN) {
-      console.warn("Mapbox token is null");
+    if (!mapContainer.current) return;
+    if (!MAPBOX_TOKEN || MAPBOX_TOKEN === "YOUR_MAPBOX_TOKEN_HERE") {
+      console.warn("Missing Mapbox token. Set NEXT_PUBLIC_MAPBOX_TOKEN.");
       return;
     }
 
     mapboxgl.accessToken = MAPBOX_TOKEN;
 
-    map.current = new mapboxgl.Map({
+    const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [11.5761, 48.1374], // Munich coordinates (based on the image)
-      zoom: 15,
-      pitch: 45, // 3D perspective
-      bearing: 0,
+      center: [11.5761, 48.1374],
+      zoom: 13,
       antialias: true,
     });
+    mapRef.current = map;
 
-    console.log("created new map");
+    map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
 
-    // Add navigation controls
-    map.current.addControl(new mapboxgl.NavigationControl(), "bottom-right");
-
-    // Add some sample markers (based on the image)
-    const markers = [
-      { name: "Kik", coordinates: [11.5761, 48.1374], type: "clothing" },
-      { name: "Norma", coordinates: [11.5771, 48.1384], type: "store" },
-      { name: "zplatz", coordinates: [11.5751, 48.1364], type: "location" },
+    const waypoints: [number, number][] = [
+      [11.5761, 48.1374], // Start: Marienplatz
+      [11.5785, 48.1379], // East of start
+      [11.5792, 48.1395], // North-east
+      [11.5778, 48.1405], // Towards Hofgarten
+      [11.5753, 48.1401], // West side
+      [11.574, 48.1386], // Back down
+      [11.5771, 48.1384], // End: near your original endpoint
     ];
+    const directionsUrl = buildDirectionsUrl("walking", waypoints);
 
-    markers.forEach((marker) => {
-      const el = document.createElement("div");
-      el.className = "marker";
-      el.style.cssText = `
-        background-color: white;
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        border: 2px solid ${marker.type === "location" ? "#10b981" : "#3b82f6"};
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      `;
+    map.on("load", () => {
+      (async () => {
+        try {
+          const res = await fetch(directionsUrl);
+          const data = await res.json();
 
-      // Add appropriate icon
-      const iconMap = {
-        clothing: "👕",
-        store: "🛒",
-        location: "📍",
-      };
-      el.textContent = iconMap[marker.type as keyof typeof iconMap];
+          const geometry = data?.routes?.[0]?.geometry as
+            | LineString
+            | undefined;
+          if (!geometry) {
+            console.error("No route returned:", data);
+            return;
+          }
 
-      new mapboxgl.Marker(el)
-        .setLngLat(marker.coordinates as [number, number])
-        .addTo(map.current!);
+          const routeSourceId = "route";
+          const routeLayerId = "route-line";
+
+          if (map.getSource(routeSourceId)) {
+            (map.getSource(routeSourceId) as mapboxgl.GeoJSONSource).setData({
+              type: "Feature",
+              properties: {},
+              geometry,
+            });
+          } else {
+            map.addSource(routeSourceId, {
+              type: "geojson",
+              data: {
+                type: "Feature",
+                properties: {},
+                geometry,
+              },
+            });
+
+            map.addLayer({
+              id: routeLayerId,
+              type: "line",
+              source: routeSourceId,
+              layout: { "line-cap": "round", "line-join": "round" },
+              paint: {
+                "line-width": 5,
+                "line-color": "#3b82f6",
+              },
+            });
+          }
+
+          // Clear old markers (HMR-safe)
+          if (window.__routeMarkers) {
+            window.__routeMarkers.forEach((m) => m.remove());
+          }
+          const newMarkers: mapboxgl.Marker[] = [];
+
+          if (waypoints.length > 0) {
+            newMarkers.push(
+              new mapboxgl.Marker({ color: "green" })
+                .setLngLat(waypoints[0])
+                .addTo(map)
+            );
+          }
+          if (waypoints.length > 1) {
+            newMarkers.push(
+              new mapboxgl.Marker({ color: "red" })
+                .setLngLat(waypoints[waypoints.length - 1])
+                .addTo(map)
+            );
+          }
+          window.__routeMarkers = newMarkers;
+
+          const coords = geometry.coordinates as [number, number][];
+          const bounds = coords.reduce(
+            (b, c) => b.extend(c),
+            new mapboxgl.LngLatBounds(coords[0], coords[0])
+          );
+          map.fitBounds(bounds, { padding: 50, duration: 800 });
+        } catch (e) {
+          console.error("Failed to load route:", e);
+        }
+      })();
     });
 
     return () => {
-      map.current?.remove();
+      if (window.__routeMarkers) {
+        window.__routeMarkers.forEach((m) => m.remove());
+        window.__routeMarkers = undefined;
+      }
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
     };
   }, []);
-
-  return <div ref={mapContainer} className="absolute inset-0 w-full h-full" />;
-
-  // If no valid Mapbox token, show placeholder
-  if (!MAPBOX_TOKEN) {
-    return (
-      <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-        {/* Placeholder map background with city-like pattern */}
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-20 left-20 w-32 h-32 bg-gray-400 rounded-lg transform rotate-12"></div>
-          <div className="absolute top-40 left-60 w-24 h-24 bg-gray-500 rounded-lg transform -rotate-12"></div>
-          <div className="absolute top-60 left-40 w-28 h-28 bg-gray-400 rounded-lg transform rotate-6"></div>
-          <div className="absolute top-80 left-80 w-20 h-20 bg-gray-500 rounded-lg transform -rotate-6"></div>
-          <div className="absolute top-32 left-120 w-36 h-36 bg-gray-400 rounded-lg transform rotate-12"></div>
-        </div>
-
-        {/* Sample markers with proper styling */}
-        <div className="absolute top-20 left-20 w-8 h-8 bg-white rounded-full border-2 border-blue-500 flex items-center justify-center text-sm shadow-lg">
-          👕
-        </div>
-        <div className="absolute top-40 left-60 w-8 h-8 bg-white rounded-full border-2 border-blue-500 flex items-center justify-center text-sm shadow-lg">
-          🛒
-        </div>
-        <div className="absolute top-60 left-40 w-8 h-8 bg-white rounded-full border-2 border-green-500 flex items-center justify-center text-sm shadow-lg">
-          📍
-        </div>
-
-        {/* Map controls */}
-        <div className="absolute bottom-4 right-4 flex flex-col space-y-2">
-          <button className="w-10 h-10 bg-white rounded shadow-lg flex items-center justify-center text-gray-600 hover:bg-gray-50">
-            +
-          </button>
-          <button className="w-10 h-10 bg-white rounded shadow-lg flex items-center justify-center text-gray-600 hover:bg-gray-50">
-            −
-          </button>
-        </div>
-      </div>
-    );
-  }
+  console.log("Mapbox token in client:", process.env.NEXT_PUBLIC_MAPBOX_TOKEN);
+  return (
+    <div
+      ref={mapContainer}
+      className="absolute inset-0 w-full h-full"
+      aria-label="Mapbox map container"
+    />
+  );
 }

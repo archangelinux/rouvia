@@ -1,0 +1,113 @@
+{
+  "test_cases": [
+    {
+      "name": "Basic Multi-Interest Sidequest",
+      "description": "Test multiple interests with 6-hour time window",
+      "curl_command": "curl -X POST http://localhost:8000/sidequest -H 'Content-Type: application/json' -d '{\"lat\": 43.4643, \"lon\": -80.5204, \"travel_distance\": 5.0, \"start_time\": \"10:00\", \"end_time\": \"16:00\", \"budget\": 100, \"interests\": [\"entertainment\", \"meals\", \"shopping\"], \"energy\": 6, \"indoor_outdoor\": \"mixed\", \"user_id\": \"test_user_1\"}'",
+      "expected_results": {
+        "activities_count": 3,
+        "interests_covered": ["entertainment", "meals", "shopping"],
+        "max_meals": 2,
+        "unvisited_places": ">= 1"
+      }
+    },
+    {
+      "name": "Short Time Priority Test",
+      "description": "2-hour sidequest should prioritize meals + entertainment over bites",
+      "curl_command": "curl -X POST http://localhost:8000/sidequest -H 'Content-Type: application/json' -d '{\"lat\": 43.4643, \"lon\": -80.5204, \"travel_distance\": 3.0, \"start_time\": \"14:00\", \"end_time\": \"16:00\", \"budget\": 50, \"interests\": [\"meals\", \"bites\", \"entertainment\"], \"energy\": 4, \"indoor_outdoor\": \"indoor\", \"user_id\": \"test_user_1\"}'",
+      "expected_results": {
+        "activities_count": 2,
+        "prioritized": "meals + entertainment",
+        "excluded": "bites",
+        "max_meals": 2
+      }
+    },
+    {
+      "name": "Full Day Meal Limit Test",
+      "description": "8-hour sidequest should allow up to 3 meals",
+      "curl_command": "curl -X POST http://localhost:8000/sidequest -H 'Content-Type: application/json' -d '{\"lat\": 43.4643, \"lon\": -80.5204, \"travel_distance\": 10.0, \"start_time\": \"09:00\", \"end_time\": \"17:00\", \"budget\": 200, \"interests\": [\"meals\", \"entertainment\", \"scenery\", \"shopping\"], \"energy\": 7, \"indoor_outdoor\": \"mixed\", \"user_id\": \"test_user_1\"}'",
+      "expected_results": {
+        "activities_count": 4,
+        "max_meals": 3,
+        "meal_timing": ["breakfast", "lunch", "dinner"]
+      }
+    },
+    {
+      "name": "Physical Activity Focus",
+      "description": "High energy outdoor activities",
+      "curl_command": "curl -X POST http://localhost:8000/sidequest -H 'Content-Type: application/json' -d '{\"lat\": 43.4643, \"lon\": -80.5204, \"travel_distance\": 8.0, \"start_time\": \"08:00\", \"end_time\": \"14:00\", \"budget\": 75, \"interests\": [\"physical_activity\", \"scenery\", \"bites\"], \"energy\": 9, \"indoor_outdoor\": \"outdoor\", \"user_id\": \"test_user_1\"}'",
+      "expected_results": {
+        "activities_count": 3,
+        "energy_level": "high",
+        "outdoor_focus": true
+      }
+    },
+    {
+      "name": "Budget Constrained",
+      "description": "Low budget sidequest",
+      "curl_command": "curl -X POST http://localhost:8000/sidequest -H 'Content-Type: application/json' -d '{\"lat\": 43.4643, \"lon\": -80.5204, \"travel_distance\": 5.0, \"start_time\": \"11:00\", \"end_time\": \"15:00\", \"budget\": 25, \"interests\": [\"scenery\", \"entertainment\"], \"energy\": 5, \"indoor_outdoor\": \"mixed\", \"user_id\": \"test_user_1\"}'",
+      "expected_results": {
+        "total_cost": "<= 25",
+        "activities_count": 2,
+        "budget_friendly": true
+      }
+    },
+    {
+      "name": "New User Test",
+      "description": "Different user_id should create new profile",
+      "curl_command": "curl -X POST http://localhost:8000/sidequest -H 'Content-Type: application/json' -d '{\"lat\": 43.4643, \"lon\": -80.5204, \"travel_distance\": 5.0, \"start_time\": \"12:00\", \"end_time\": \"18:00\", \"budget\": 80, \"interests\": [\"entertainment\", \"meals\"], \"energy\": 6, \"indoor_outdoor\": \"mixed\", \"user_id\": \"new_user_123\"}'",
+      "expected_results": {
+        "activities_count": 2,
+        "new_user": true,
+        "default_visited": ["Royal Ontario Museum", "Tim Hortons"]
+      }
+    },
+    {
+      "name": "Invalid Interests Fallback",
+      "description": "Invalid interests should fallback to entertainment",
+      "curl_command": "curl -X POST http://localhost:8000/sidequest -H 'Content-Type: application/json' -d '{\"lat\": 43.4643, \"lon\": -80.5204, \"travel_distance\": 5.0, \"start_time\": \"13:00\", \"end_time\": \"17:00\", \"budget\": 60, \"interests\": [\"invalid_interest\", \"another_invalid\"], \"energy\": 5, \"indoor_outdoor\": \"mixed\", \"user_id\": \"test_user_1\"}'",
+      "expected_results": {
+        "fallback_interest": "entertainment",
+        "activities_count": 1
+      }
+    },
+    {
+      "name": "No Interests Default",
+      "description": "No interests provided should use entertainment default",
+      "curl_command": "curl -X POST http://localhost:8000/sidequest -H 'Content-Type: application/json' -d '{\"lat\": 43.4643, \"lon\": -80.5204, \"travel_distance\": 5.0, \"start_time\": \"10:00\", \"end_time\": \"14:00\", \"budget\": 40, \"energy\": 5, \"indoor_outdoor\": \"mixed\", \"user_id\": \"test_user_1\"}'",
+      "expected_results": {
+        "default_interest": "entertainment",
+        "activities_count": 1
+      }
+    },
+    {
+      "name": "High Energy Adventure",
+      "description": "Full day outdoor adventure",
+      "curl_command": "curl -X POST http://localhost:8000/sidequest -H 'Content-Type: application/json' -d '{\"lat\": 43.4643, \"lon\": -80.5204, \"travel_distance\": 15.0, \"start_time\": \"07:00\", \"end_time\": \"19:00\", \"budget\": 150, \"interests\": [\"physical_activity\", \"scenery\", \"meals\"], \"energy\": 10, \"indoor_outdoor\": \"outdoor\", \"user_id\": \"adventure_user\"}'",
+      "expected_results": {
+        "activities_count": 3,
+        "max_meals": 3,
+        "high_energy": true,
+        "outdoor_focus": true
+      }
+    },
+    {
+      "name": "Evening Entertainment",
+      "description": "Evening sidequest with entertainment focus",
+      "curl_command": "curl -X POST http://localhost:8000/sidequest -H 'Content-Type: application/json' -d '{\"lat\": 43.4643, \"lon\": -80.5204, \"travel_distance\": 5.0, \"start_time\": \"18:00\", \"end_time\": \"22:00\", \"budget\": 120, \"interests\": [\"entertainment\", \"meals\", \"shopping\"], \"energy\": 6, \"indoor_outdoor\": \"indoor\", \"user_id\": \"test_user_1\"}'",
+      "expected_results": {
+        "activities_count": 3,
+        "evening_timing": true,
+        "indoor_focus": true
+      }
+    }
+  ],
+  "validation_rules": {
+    "one_per_interest": "Each interest category should have exactly one activity",
+    "meal_limits": "Max 3 meals/day, 2 meals/half day",
+    "unvisited_places": "At least one activity must be unvisited",
+    "time_priority": "Short time prioritizes meals + entertainment over bites",
+    "food_spreading": "Meals should be spread throughout the day",
+    "fallback_behavior": "Invalid interests fallback to entertainment"
+  }
+}

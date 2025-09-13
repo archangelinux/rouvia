@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Mic, Send } from "lucide-react";
+import { useState, useRef, useEffect } from 'react';
+import { Mic, Send, MessageCircle, Settings } from 'lucide-react';
+import FilterPanel from './FilterPanel';
 
 interface ChatMessage {
   id: string;
@@ -28,6 +29,7 @@ export default function ChatInterface() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [mode, setMode] = useState<'chat' | 'filters'>('chat');
 
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
@@ -142,77 +144,108 @@ export default function ChatInterface() {
 
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-200 flex flex-col max-h-[40vh]">
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-        {messages.map((msg, index) => {
-          const isRecent = index >= messages.length - 3;
-          const opacity = isRecent
-            ? 1
-            : Math.max(0.3, 1 - (messages.length - index) * 0.1);
+      {/* Mode Toggle */}
+      <div className="flex border-b border-gray-100">
+        <button
+          onClick={() => setMode('chat')}
+          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+            mode === 'chat'
+              ? 'text-green-600 border-b-2 border-green-600 bg-green-50'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <MessageCircle size={16} className="inline mr-2" />
+          Chat
+        </button>
+        <button
+          onClick={() => setMode('filters')}
+          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+            mode === 'filters'
+              ? 'text-green-600 border-b-2 border-green-600 bg-green-50'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Settings size={16} className="inline mr-2" />
+          Filters
+        </button>
+      </div>
 
-          return (
-            <div
-              key={msg.id}
-              className="animate-fade-in-left"
-              style={{ opacity }}
-            >
-              <div className="text-gray-800 text-base leading-relaxed font-light">
-                {msg.text.split("").map((char, charIndex) => (
-                  <span
-                    key={charIndex}
-                    className="animate-char-fade-in"
-                    style={{
-                      animationDelay: `${charIndex * 0.02}s`,
-                      animationFillMode: "both",
-                    }}
-                  >
-                    {char}
-                  </span>
-                ))}
-              </div>
+      {/* Content based on mode */}
+      {mode === 'chat' ? (
+        <>
+          {/* Messages Container */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+            {messages.map((msg, index) => {
+              const isRecent = index >= messages.length - 3;
+              const opacity = isRecent ? 1 : Math.max(0.3, 1 - (messages.length - index) * 0.1);
+              
+              return (
+                <div
+                  key={msg.id}
+                  className="animate-fade-in-left"
+                  style={{ opacity }}
+                >
+                  <div className="text-gray-800 text-base leading-relaxed font-light">
+                    {msg.text.split('').map((char, charIndex) => (
+                      <span
+                        key={charIndex}
+                        className="animate-char-fade-in"
+                        style={{ 
+                          animationDelay: `${charIndex * 0.02}s`,
+                          animationFillMode: 'both'
+                        }}
+                      >
+                        {char}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+          
+          {/* Input Field */}
+          <div className="p-4 border-t border-gray-100">
+            <div className="flex items-center space-x-4">
+              <input
+                type="text"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Type your route here"
+                className="flex-1 border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-800 placeholder-gray-500"
+                onKeyPress={(e) => e.key === 'Enter' && handleSubmit(e)}
+              />
+              
+              {/* Voice Input Button */}
+              <button
+                type="button"
+                onClick={handleVoiceClick}
+                className={`rounded-full w-10 h-10 flex items-center justify-center transition-colors duration-150 ${
+                  isRecording ? 'bg-red-500 text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+                title={isRecording ? 'Stop recording' : 'Voice input'}
+              >
+                <Mic size={18} />
+              </button>
+              
+              {/* Send Button */}
+              <button
+                type="submit"
+                onClick={handleSubmit}
+                className="rounded-full w-10 h-10 flex items-center justify-center bg-black text-white hover:bg-gray-800 transition-colors duration-150"
+                title="Send"
+              >
+                <Send size={18} />
+              </button>
             </div>
-          );
-        })}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Field */}
-      <div className="p-4 border-t border-gray-100">
-        <div className="flex items-center space-x-4">
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Type your route here"
-            className="flex-1 border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-800 placeholder-gray-500"
-            onKeyPress={(e) => e.key === "Enter" && handleSubmit(e)}
-          />
-
-          {/* Voice Input Button */}
-          <button
-            type="button"
-            onClick={handleVoiceClick}
-            className={`rounded-full w-10 h-10 flex items-center justify-center transition-colors duration-150 ${
-              isRecording
-                ? "bg-red-500 text-white"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-            title={isRecording ? "Stop recording" : "Voice input"}
-          >
-            <Mic size={18} />
-          </button>
-
-          {/* Send Button */}
-          <button
-            type="submit"
-            onClick={handleSubmit}
-            className="rounded-full w-10 h-10 flex items-center justify-center bg-black text-white hover:bg-gray-800 transition-colors duration-150"
-            title="Send"
-          >
-            <Send size={18} />
-          </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          <FilterPanel />
         </div>
-      </div>
+      )}
     </div>
   );
 }

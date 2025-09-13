@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import MapboxMap from '@/components/MapboxMap';
 import UserProfile from '@/components/UserProfile';
 import ChatInterface from '@/components/ChatInterface';
-import RouteResults from '@/components/RouteResults';
+import RoutePlanningPanel from '@/components/RoutePlanningPanel';
 
 export default function Home() {
   const [chatOpen, setChatOpen] = useState(true);
@@ -19,9 +19,11 @@ export default function Home() {
         <UserProfile />
       </div>
       
-      {/* Left Side - Route Results Panel */}
+  
+      
+      {/* Left Side - Route Planning Panel */}
       <div className="absolute top-6 left-6 z-10 w-96">
-        <RouteResults />
+        <RoutePlanningPanel />
       </div>
       
       {/* Left Side - Chat Interface */}
