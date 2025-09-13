@@ -1,14 +1,14 @@
 # Stage 1: Install dependencies
 FROM node:18-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY client/package.json client/package-lock.json* ./
 RUN npm ci
 
 # Stage 2: Build the Next.js application
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY client/ .
 RUN npm run build
 
 # Stage 3: Run the Next.js application
