@@ -9,7 +9,8 @@ INTEREST_CATEGORIES = [
     "bites", 
     "entertainment", 
     "physical_activity", 
-    "scenery"
+    "scenery",
+    "culture"
 ]
 
 class SidequestRequest(BaseModel):
