@@ -146,6 +146,11 @@ if __name__ == "__main__":
                 if result:
                     print(f"✅ Route planning successful!")
                     print(f"📝 Result: {result}")
+
+                    import json
+                    json_result = result.model_dump()  # Convert Pydantic model to dict
+                    print(f"\n🔧 JSON Output:")
+                    print(json.dumps(json_result, indent=2))
                 else:
                     print("⚠️ Route planning returned empty result")
 
