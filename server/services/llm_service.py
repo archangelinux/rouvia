@@ -21,14 +21,15 @@ def parse_intent(starting_location: str, text: str) -> dict:
     """
 
     system_rules = (
-        "You extract detailed destination CATEGORIES only. "
-        "Return a STRICT JSON object with exactly three keys: "
-        "1) 'place_types': an array of Google Places API place types (lowercase snake_case), sorted in the order that the user wants to visit them. "
-        "2) 'last_destination': a string representing the last element from 'place_types'. This should be the final destination the user wants to visit. "
-        "3) 'search_radius_meters': an integer representing the search radius in meters from the starting location. If no specific destinations are mentioned, default to 10000 meters. "
-        "If the user specifies only one destination, 'last_destination' is that destination, and the number of categories in 'place_types' should be 1. "
-        "No extra text. No markdown. No code fences."
-    )
+    "You will first check if the user specifies specific locations. If so, prioritize those locations over general categories. "
+    "If specific locations are provided, return them directly. If only categories are given, proceed to select places based on those categories. "
+    "Return a STRICT JSON object with exactly three keys: "
+    "1) 'place_types': an array of Google Places API place types (lowercase snake_case) that represents the user's intended destinations. If specific locations are mentioned, use those instead of categories. "
+    "2) 'last_destination': a string representing the last destination the user wants to visit. This should be the final destination in 'place_types'. If specific locations are given, this will be the last specified location. "
+    "3) 'search_radius_meters': an integer representing the search radius in meters from the starting location. If no specific locations are mentioned, default to 10000 meters. "
+    "If the user specifies only one destination, 'last_destination' should match that destination, and 'place_types' should contain only that destination. "
+    "No extra text. No markdown. No code fences."
+)
 
     prompt = f"{system_rules}\n Starting location: {starting_location}\n User text: {text}"
 
