@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any
 import datetime
 import uvicorn
-from server.routers import plan_route_audio
+from routers import plan_route_audio
 
 app = FastAPI(
     title="Rouvia API",

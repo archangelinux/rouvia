@@ -6,8 +6,8 @@
 # finally we send the route to the frontend for mapbox to render
 
 from fastapi import APIRouter, HTTPException, status, UploadFile
-from server.schemas.plan_route_audio import GoogleDirectionsResponse
-from services import speech_to_text
+from schemas.plan_route_audio import GoogleDirectionsResponse
+from services import speech_to_text, llm_service
 
 router = APIRouter()
 
