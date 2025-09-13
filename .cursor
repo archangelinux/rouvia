@@ -1,0 +1,71 @@
+# Cursor AI Assistant Rules for Rouvia Project
+
+## Core Principles
+- Always follow best software practices
+- Never complete a task if there are errors
+- Always ask clarifying questions and analyze approaches before executing
+- Write code that follows ESLint rules (no `any` types, no unused imports, etc.)
+- Can run terminal commands EXCEPT `git commit` and `git push`
+
+## Documentation Requirements
+- ALWAYS update README.md after making changes
+- ALWAYS update architecture.md after structural changes
+- ALWAYS update styling.md after UI/styling changes
+- ALWAYS update vision.md after feature/scope changes
+
+## Project Context: Rouvia - Smart Hands-Free Driver Assistance
+
+### Function
+For smart hands-free driver assistance. Create specific routes with natural language:
+- Voice control
+- Smart routing (no manual input)
+- Access to saved user data
+
+### Core Tasks
+
+#### Frontend
+- Mapbox integration
+- Chatbox interface (type and voice)
+- Voice is default, response is generated list of destinations
+- User can click to edit/type/drag around destinations
+
+#### Backend
+- Get input: voice to text (Whisper)
+- Text to LLM (Gemini)
+- Gemini parse intent
+- Get places: Langraph to send places (+ constraints) info to Google Places API
+- Feed place options (from API) into Gemini to choose optimal destinations
+- Put optimal destinations into Google Destination API to choose optimal route
+
+### Implementation Details
+- Voice transcription: OpenAI Whisper
+- LLM: Gemini with Google Maps API access
+- Orchestration: Langraph
+- Constraints: distance, time
+- Data access: user's networks' past locations
+- Future features: "Sidequest" mode
+
+## Code Quality Standards
+- TypeScript strict mode
+- No `any` types
+- No unused imports
+- Proper error handling
+- Clean, readable code
+- Comprehensive comments for complex logic
+- Follow Next.js and FastAPI best practices
+
+## Workflow Rules
+1. Analyze requirements thoroughly
+2. Ask clarifying questions if unclear
+3. Compare different approaches
+4. Implement with best practices
+5. Test functionality
+6. Update documentation
+7. Never commit/push without user approval
+
+## Technology Stack
+- Frontend: Next.js 15, TypeScript, Tailwind CSS, Mapbox
+- Backend: FastAPI, Python 3.11
+- AI/ML: OpenAI Whisper, Gemini, Langraph
+- APIs: Google Places API, Google Directions API
+- Infrastructure: Docker, Nginx
