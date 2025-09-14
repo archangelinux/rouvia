@@ -8,7 +8,8 @@ load_dotenv()  # tries current working dir
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=False)
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", override=False)
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Body
+from pymongo import MongoClient
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -16,6 +17,8 @@ import datetime
 import uvicorn
 from routers import plan_route_audio, sidequest
 from services import google_places  # ← now this sees the env var loaded above
+from services.mongo import user_profiles_col
+from mock_data import update_user_location, get_user_locations
 
 app = FastAPI(
     title="Rouvia API",
@@ -24,6 +27,8 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# MongoDB connection is handled in services.mongo
 
 # CORS middleware
 origins = [
@@ -36,11 +41,11 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=["*"],
     #allow_origins=origins,      # allow these origins
     allow_credentials=True,
     allow_methods=["*"],        # allow all HTTP methods
     allow_headers=["*"],        # allow all headers
-    allow_origins=["*"]
 )
 
 
@@ -70,8 +75,61 @@ class DebugIntent(BaseModel):
     open_now: Optional[bool] = None
     min_rating: Optional[float] = None
     max_results: Optional[int] = 10
+'''
+@app.post("/update-location/{user_id}")
+def update_location(user_id: str, location: dict = Body(...)):
+    """
+    location example:
+    {
+        "name": "home",
+        "coords": ["long", "lat"],
+        "address": "123 Main St, City, State"
+    }
+    """
+    try:
+        # Prepare location data to store
+        location_data = {
+            "coords": location.get("coords", [0, 0]),
+            "address": location.get("address", ""),
+            "updated_at": datetime.datetime.now().isoformat()
+        }
+        
+        # Try MongoDB first
+        try:
+            result = user_profiles_col.update_one(
+                {"user_id": user_id},
+                {"$set": {f"locations.{location['name']}": location_data}},
+                upsert=True
+            )
+            return {"success": True, "modified": result.modified_count, "source": "mongodb"}
+        except Exception as mongo_error:
+            print(f"⚠️ MongoDB failed, using mock data: {mongo_error}")
+            # Fallback to mock data
+            update_user_location(user_id, location['name'], location_data)
+            return {"success": True, "modified": 1, "source": "mock"}
+            
+    except Exception as e:
+        print(f"❌ Error updating location: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/saved-locations/{user_id}")
+def get_saved_locations(user_id: str):
+    """
+    Get all saved locations for a user
+    """
+    try:
+        user_profile = user_profiles_col.find_one({"user_id": user_id})
+        if not user_profile:
+            return {"locations": {}}
+        
+        locations = user_profile.get("locations", {})
+        return {"locations": locations}
+    except Exception as e:
+        print(f"❌ Error getting saved locations: {e}")
+        return {"locations": {}, "error": str(e)}
 
 
+'''
 @app.post("/debug/places", tags=["debug"])
 def debug_places(intent: DebugIntent):
     try:

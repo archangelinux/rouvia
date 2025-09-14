@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Wand2 } from 'lucide-react';
+import { MessageCircle, Sparkles, Wand2 } from 'lucide-react';
 
 interface FilterState {
   energy: number;

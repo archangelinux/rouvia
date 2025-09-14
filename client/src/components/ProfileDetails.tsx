@@ -170,6 +170,8 @@ export default function ProfileDetails({ onClose }: ProfileDetailsProps) {
   ]);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
 
+  // No backend integration - using local state only
+
   const handleEditLocation = (id: string) => {
     const location = locations.find(loc => loc.id === id);
     if (location) {
@@ -178,17 +180,36 @@ export default function ProfileDetails({ onClose }: ProfileDetailsProps) {
   };
 
   const handleSaveLocation = (updatedLocation: Location) => {
+    // Update local state only - no backend integration
     setLocations(prev => 
       prev.map(loc => 
         loc.id === updatedLocation.id ? updatedLocation : loc
       )
     );
     setEditingLocation(null);
+    console.log('Location updated locally:', updatedLocation);
   };
 
   const handleAddNewLocation = () => {
-    // TODO: Implement add new location functionality
-    console.log('Add new location');
+    // Create a new location with a unique ID
+    const newLocation: Location = {
+      id: (Date.now()).toString(), // Use timestamp for unique ID
+      name: 'New Location',
+      address: 'Enter address'
+    };
+    
+    // Add to local state
+    setLocations(prev => [...prev, newLocation]);
+    
+    // Open the edit modal for the new location
+    setEditingLocation(newLocation);
+    console.log('New location added:', newLocation);
+  };
+
+  const handleDeleteLocation = (id: string) => {
+    // Remove location from local state
+    setLocations(prev => prev.filter(loc => loc.id !== id));
+    console.log('Location deleted:', id);
   };
 
   return (
@@ -237,13 +258,22 @@ export default function ProfileDetails({ onClose }: ProfileDetailsProps) {
                     <p className="text-base text-gray-700">{location.address}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleEditLocation(location.id)}
-                  className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors flex items-center space-x-2"
-                >
-                  <Edit size={16} />
-                  <span>Edit</span>
-                </button>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleEditLocation(location.id)}
+                    className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors flex items-center space-x-2"
+                  >
+                    <Edit size={16} />
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteLocation(location.id)}
+                    className="bg-red-200 text-red-700 px-4 py-2 rounded-lg hover:bg-red-300 transition-colors flex items-center space-x-2"
+                  >
+                    <X size={16} />
+                    <span>Delete</span>
+                  </button>
+                </div>
               </div>
             </div>
           ))}
