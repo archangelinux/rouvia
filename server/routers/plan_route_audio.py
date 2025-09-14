@@ -16,7 +16,7 @@ from services import speech_to_text, llm_service, google_places
 router = APIRouter()
 
 AUDIO_FILES_DIR = "audiofiles"
-os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
+# os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
 
 
 # -----------------------------
@@ -114,29 +114,43 @@ async def plan_route_audio(
     Accepts an audio file upload and optional location JSON.
     Saves the file, transcribes with Whisper, runs intent->places->stops pipeline, returns final response.
     """
+
     try:
-        # Persist uploaded audio to disk
+        print(f"🎵 === STARTING AUDIO PROCESSING ===")
+        print(f"🎵 Audio filename: {audio.filename}")
+        print(f"🎵 Audio content type: {audio.content_type}")
+        
+        # Parse optional location first
+        lat, lng = _parse_location_json(location)
+        print(f"🗺️ Parsed location: lat={lat}, lng={lng}")
+
+        audio.file.seek(0)
+        
         _, ext = os.path.splitext(audio.filename or "")
         ext = ext or ".wav"
         saved_name = f"{uuid.uuid4()}{ext}"
         saved_path = os.path.join(AUDIO_FILES_DIR, saved_name)
-
+        
+        print(f"💾 Saving to path: {saved_path}")
         with open(saved_path, "wb") as f:
             shutil.copyfileobj(audio.file, f)
+        
+        print(f"✅ File saved successfully")
+        print(f"📊 File size: {os.path.getsize(saved_path)} bytes")
 
-        # Parse optional location
-        lat, lng = _parse_location_json(location)
+        # 2) Reset file pointer again for transcription
+        audio.file.seek(0)
+        
+        # 3) Transcribe
+        print(f"🎤 Starting transcription...")
+        text = speech_to_text.transcribe(audio)
+        print(f"📝 Transcription complete: {text}")
 
-        # 1) Transcribe
-        with open(saved_path, "rb") as f:
-            upload = UploadFile(
-                filename=saved_name, file=f
-            )  # keep existing transcribe signature
-            text = speech_to_text.transcribe(upload)
-
-        # Run the shared pipeline from transcribed text
-        return _pipeline_from_text(text=text, lat=lat, lng=lng)
-
+        # 4) Run the pipeline
+        print(f"🔄 Starting pipeline...")
+        result = _pipeline_from_text(text=text, lat=lat, lng=lng)
+        print(f"✅ Pipeline complete")
+        return result
     except HTTPException:
         raise
     except Exception as e:

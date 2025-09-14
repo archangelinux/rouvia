@@ -35,7 +35,8 @@ export default function ChatInterface() {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
     null
   );
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const API_URL_AUDIO = "http://localhost:8000/plan-route-audio";
   const API_URL_TEXT = "http://localhost:8000/plan-route-text";
@@ -121,76 +122,143 @@ export default function ChatInterface() {
   };
 
   // Voice -> POST /plan-route-audio (multipart/form-data)
-  const handleVoiceClick = async () => {
+   const handleVoiceClick = async () => {
     if (!isRecording) {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-
-      recorder.ondataavailable = (e) =>
-        setAudioChunks((prev) => [...prev, e.data]);
-
-      recorder.onstop = async () => {
-        const blob = new Blob(audioChunks, { type: "audio/wav" });
-        setAudioChunks([]);
-
-        const placeholderId = appendMessage({
-          text: "🎙️ Transcribing…",
-          role: "user",
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream; // Store stream reference
+        
+        const recorder = new MediaRecorder(stream, {
+          mimeType: 'audio/webm' // More widely supported than wav
         });
 
-        let location: { latitude: number; longitude: number } | null = null;
-        try {
-          location = await getUserLocation();
-          if (location) setUserLocation(location);
-        } catch {
-          /* optional */
-        }
+        // Clear previous chunks
+        audioChunksRef.current = [];
 
-        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-        const filename = `voice-${timestamp}.wav`;
+        recorder.ondataavailable = (e) => {
+          console.log("📊 Data available:", e.data.size, "bytes");
+          if (e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
 
-        const formData = new FormData();
-        formData.append("audio", blob, filename);
-        if (location) formData.append("location", JSON.stringify(location));
+        recorder.onstop = async () => {
+          console.log("🎙️ Recording stopped");
+          console.log("🎙️ Audio chunks:", audioChunksRef.current.length);
+          
+          const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          console.log("🎙️ Blob size:", blob.size, "bytes");
+          console.log("🎙️ Blob type:", blob.type);
 
-        try {
-          const res = await fetch(API_URL_AUDIO, {
-            method: "POST",
-            body: formData,
+          if (blob.size === 0) {
+            console.error("❌ Empty audio blob! Recording may have been too short.");
+            appendMessage({
+              text: "⚠️ Recording was too short or empty. Please hold the microphone button longer.",
+              role: "system",
+            });
+            return;
+          }
+
+          const placeholderId = appendMessage({
+            text: "🎙️ Transcribing…",
+            role: "user",
           });
-          const result = await res.json();
 
-          const transcript: string = result.transcribed_text || "";
-          replaceMessageText(
-            placeholderId,
-            transcript || "🎙️ (No transcript returned)"
-          );
+          let location: { latitude: number; longitude: number } | null = null;
+          try {
+            location = await getUserLocation();
+            if (location) setUserLocation(location);
+          } catch {
+            /* optional */
+          }
 
-          pushStopsToContext(result.stops);
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+          const filename = `voice-${timestamp}.webm`;
 
-          const botReply: string = result.message || "";
-          if (botReply) appendMessage({ text: botReply, role: "assistant" });
-        } catch (err) {
-          replaceMessageText(
-            placeholderId,
-            "⚠️ Transcription failed. Please try again."
-          );
-          console.error("Failed to send audio:", err);
-        }
-      };
+          const formData = new FormData();
+          formData.append("audio", blob, filename);
+          if (location) formData.append("location", JSON.stringify(location));
 
-      recorder.start();
-      setMediaRecorder(recorder);
-      setIsRecording(true);
+          console.log("📤 Sending FormData with blob size:", blob.size);
+
+          try {
+            const res = await fetch(API_URL_AUDIO, {
+              method: "POST",
+              body: formData,
+            });
+            
+            if (!res.ok) {
+              const errorText = await res.text();
+              console.error("Server error:", errorText);
+              throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            
+            const result = await res.json();
+
+            const transcript: string = result.transcribed_text || "";
+            replaceMessageText(
+              placeholderId,
+              transcript || "🎙️ (No transcript returned)"
+            );
+
+            pushStopsToContext(result.stops);
+
+            const botReply: string = result.message || "";
+            if (botReply) appendMessage({ text: botReply, role: "assistant" });
+          } catch (err) {
+            replaceMessageText(
+              placeholderId,
+              "⚠️ Transcription failed. Please try again."
+            );
+            console.error("Failed to send audio:", err);
+          }
+
+          // Clean up
+          audioChunksRef.current = [];
+        };
+
+        // Start recording with timeslice to ensure regular data events
+        recorder.start(100); // Request data every 100ms
+        setMediaRecorder(recorder);
+        setIsRecording(true);
+        
+        console.log("🎙️ Recording started");
+        
+      } catch (err) {
+        console.error("❌ Failed to start recording:", err);
+        appendMessage({
+          text: "⚠️ Could not access microphone. Please check permissions.",
+          role: "system",
+        });
+      }
     } else {
       // Stop recording if active
-      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      console.log("⏹️ Stopping recording...");
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        // Don't call requestData(), just stop
         mediaRecorder.stop();
       }
+      
+      // Clean up stream
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      
       setIsRecording(false);
+      setMediaRecorder(null);
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  // ADD THE RETURN STATEMENT HERE - your JSX component
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-200 flex flex-col max-h-[40vh]">
       {/* Mode Toggle */}

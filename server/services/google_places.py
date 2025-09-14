@@ -199,7 +199,7 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
                 cand = PlaceCandidate.from_api(p)
 
                 # Print each candidate
-                print(f"   📍 {cand.name} - Types: {cand.types} - Rating: {cand.rating}")
+                print(f"   📍 {cand.name} - Types: {cand.types} - Rating: {cand.rating} - Location: {cand.lat},{cand.lng}")
 
                 # filter by rating if configured
                 if (
@@ -242,5 +242,5 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
 
     # Sort results to make LLM selection easier:
     # primary: rating desc, secondary: user_ratings_total desc
-    out.sort(key=lambda c: ((c.rating or 0), (c.user_ratings_total or 0)), reverse=True)
+    # out.sort(key=lambda c: ((c.rating or 0), (c.user_ratings_total or 0)), reverse=True)
     return out

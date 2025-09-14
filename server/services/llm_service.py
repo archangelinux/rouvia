@@ -64,7 +64,7 @@ def select_stops(intent: dict, candidates: list) -> list:
         "Choose places based on the following priorities: "
         "1) User intent (consider the user’s specific mention of the place and their context). "
         "2) Proximity to the starting location (closer places are preferred). "
-        "3) Rating (higher-rated places are preferred but first prioritize proximity and weigh rating the least). "
+        "3) Rating (ONLY CONSIDER RATING IF PROXIMITY AND USER INTENT ARE EQUIVALENT. ALWAYS PRIORITIZE PROXIMITY AND USER INTENT FIRST). "
         "The last place in the returned list must match the 'last_destination' from the intent. "
         "If a category has no matching candidates, include the most relevant option from the available candidates. "
         "No extra text. No markdown. No code fences."
