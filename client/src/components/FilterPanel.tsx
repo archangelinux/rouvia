@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { MessageCircle, Sparkles, Wand2 } from 'lucide-react';
+import { useRoute, type PlaceStop } from "@/components/context/route-context";
 
 interface FilterState {
   energy: number;
@@ -38,7 +39,49 @@ async function getUserLocation(): Promise<{ latitude: number; longitude: number 
   });
 }
 
+// Type for the API response based on the schema
+type SidequestActivity = {
+  title: string;
+  lat: number;
+  lon: number;
+  start_time?: string;
+  duration_hours: number;
+  cost?: number;
+  activity_type: string;
+  indoor_outdoor: string;
+  energy_level: number;
+  confidence: number;
+};
+
+type SidequestResponse = {
+  itinerary: SidequestActivity[];
+  total_duration: number;
+  total_cost: number;
+  summary: string;
+  metadata: {
+    activities_considered: number;
+    activities_selected: number;
+    activities_in_itinerary: number;
+    generation_time?: string;
+  };
+};
+
+// Helper function to map SidequestActivity to PlaceStop
+function mapActivityToPlaceStop(activity: SidequestActivity, index: number): PlaceStop {
+  return {
+    place_id: `sidequest-${index}-${activity.title}-${activity.lat},${activity.lon}`,
+    name: activity.title,
+    address: "", // API doesn't provide address
+    lat: activity.lat,
+    lng: activity.lon,
+    // Optional fields could be added here if needed
+    types: [activity.activity_type],
+  };
+}
+
 export default function FilterPanel() {
+  const { setUserLocation, setStops, setWaypoints } = useRoute();
+  
   const [filters, setFilters] = useState<FilterState>({
     energy: 5,
     interests: {
@@ -119,25 +162,18 @@ export default function FilterPanel() {
     try {
       location = await getUserLocation();
       console.log("User location:", location.latitude, location.longitude);
+      setUserLocation(location); // Update route context
     } catch (err) {
       console.error("Failed to get location:", err);
-      location = null;
+      alert("Please enable location access and try again.");
+      return;
     }
 
-    if(!location) {
-      console.log("Location not found, line 157 FilterPanel.tsx")
-      return (
-        <div>
-          <p>Please enable location access and try again.</p>
-        </div>
-      )
-    }
-
-    // Fix: Get selected interests as array of strings
+    // Get selected interests as array of strings
     const selectedInterests = Object.keys(filters.interests)
       .filter(key => filters.interests[key as keyof typeof filters.interests]);
 
-    // Fix: Get selected indoor/outdoor preference as string or null
+    // Get selected indoor/outdoor preference as string or null
     const selectedIndoorOutdoor = 
       filters.indoorOutdoor.indoor && filters.indoorOutdoor.outdoor ? null :
       filters.indoorOutdoor.indoor ? "indoor" :
@@ -168,78 +204,38 @@ export default function FilterPanel() {
       });
 
       if (response.ok) {
-        const result = await response.json();
-        console.log('Sidequest generated:', result);
-        
-        // Return well-structured JSON object with all input parameters
-        const structuredResponse = {
-          inputParameters: {
-            lat: location.latitude,
-            lon: location.longitude,
-            energy: filters.energy,
-            interests: Object.keys(filters.interests).filter(key => filters.interests[key as keyof typeof filters.interests]),
-            budget: filters.budget,
-            time: {
-              start: filters.time.start,
-              end: filters.time.end,
-            },
-            indoorOutdoor: Object.keys(filters.indoorOutdoor).filter(key => filters.indoorOutdoor[key as keyof typeof filters.indoorOutdoor]),
-            distance: distanceNumber,
-          },
-          generatedSidequest: result,
-          timestamp: new Date().toISOString(),
-          status: 'success'
-        };
-        
-        console.log('Structured response:', structuredResponse);
-        return structuredResponse;
+        const result: SidequestResponse = await response.json();
+        console.log('Raw sidequest response:', result);
+
+        // Map activities to PlaceStop objects
+        const placeStops: PlaceStop[] = result.itinerary.map(mapActivityToPlaceStop);
+        console.log('Mapped place stops:', placeStops);
+
+        // Update route context
+        setStops(placeStops);
+
+        // Create waypoints: user location + all activity locations
+        const waypoints: [number, number][] = [
+          [location.longitude, location.latitude], // User location first
+          ...placeStops.map(stop => [stop.lng, stop.lat])
+        ];
+        setWaypoints(waypoints);
+
+        console.log('Route context updated:', {
+          userLocation: location,
+          stops: placeStops,
+          waypoints: waypoints,
+        });
+
+        alert(`Sidequest generated! ${result.itinerary.length} activities planned. Total duration: ${result.total_duration.toFixed(1)} hours.`);
       } else {
-        console.error('Failed to generate sidequest');
-        const errorResponse = {
-          inputParameters: {
-            latitude: location.latitude,
-            longitude: location.longitude,
-            energy: filters.energy,
-            interests: Object.keys(filters.interests).filter(key => filters.interests[key as keyof typeof filters.interests]),
-            budget: filters.budget,
-            time: {
-              start: filters.time.start,
-              end: filters.time.end,
-            },
-            indoorOutdoor: Object.keys(filters.indoorOutdoor).filter(key => filters.indoorOutdoor[key as keyof typeof filters.indoorOutdoor]),
-            distance: distanceNumber,
-          },
-          error: 'Failed to generate sidequest',
-          timestamp: new Date().toISOString(),
-          status: 'error'
-        };
-        console.log('Error response:', errorResponse);
-        return errorResponse;
+        const errorText = await response.text();
+        console.error('Failed to generate sidequest:', response.status, errorText);
+        alert('Failed to generate sidequest. Please try again.');
       }
     } catch (error) {
       console.error('Error generating sidequest:', error);
-      const errorResponse = {
-        inputParameters: {
-          location: {
-            latitude: location.latitude,
-            longitude: location.longitude,
-          },
-          energy: filters.energy,
-          interests: Object.keys(filters.interests).filter(key => filters.interests[key as keyof typeof filters.interests]),
-          budget: filters.budget,
-          time: {
-            start: filters.time.start,
-            end: filters.time.end,
-          },
-          indoorOutdoor: Object.keys(filters.indoorOutdoor).filter(key => filters.indoorOutdoor[key as keyof typeof filters.indoorOutdoor]),
-          distance: distanceNumber,
-        },
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        timestamp: new Date().toISOString(),
-        status: 'error'
-      };
-      console.log('Error response:', errorResponse);
-      return errorResponse;
+      alert('Unexpected error while generating sidequest.');
     }
   };
 
