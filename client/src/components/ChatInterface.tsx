@@ -42,8 +42,8 @@ export default function ChatInterface({ userSub }: ChatInterfaceProps) {
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const API_URL_AUDIO = "http://localhost:8000/enhanced-plan-route-audio";
-  const API_URL_TEXT = "http://localhost:8000/enhanced-plan-route-text";
+  const API_URL_AUDIO = "http://localhost:8000/plan-route-audio";
+  const API_URL_TEXT = "http://localhost:8000/plan-route-text";
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -364,12 +364,12 @@ export default function ChatInterface({ userSub }: ChatInterfaceProps) {
   }, []);
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 flex flex-col max-h-[40vh]">
+    <div className="bg-white rounded-tl-2xl rounded-tr-2xl rounded-br-2xl rounded-bl-2xl shadow-lg border border-gray-200 flex flex-col max-h-[40vh]">
       {/* Mode Toggle */}
       <div className="flex border-b border-gray-100">
         <button
           onClick={() => setMode("chat")}
-          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors rounded-tl-2xl ${
             mode === "chat"
               ? "text-green-600 border-b-2 border-green-600 bg-green-50"
               : "text-gray-500 hover:text-gray-700"
