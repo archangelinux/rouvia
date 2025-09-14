@@ -5,13 +5,9 @@ from datetime import datetime
 # Standardized interest categories
 INTEREST_CATEGORIES = [
     "shopping", 
-    "meals", 
-    "bites", 
-    "entertainment", 
-    "physical_activity", 
+    "food", 
+    "entertainment",
     "scenery",
-    "culture",
-    "events"
 ]
 
 class SidequestRequest(BaseModel):
