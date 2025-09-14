@@ -1,29 +1,39 @@
 import { useSession } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+
+interface VisitedPlace {
+  place_name: string;
+  place_id: string;
+  activity_type: string;
+  visited_date: string;
+  location: string;
+}
+
+interface Preferences {
+  favorite_cuisines: string[];
+  budget_range: string;
+  energy_level: number;
+}
 
 interface UserProfile {
   user_id: string;
   email: string;
   name: string;
   picture?: string;
-  visited_places: any[];
-  preferences: {
-    favorite_cuisines: string[];
-    budget_range: string;
-    energy_level: number;
-  };
+  visited_places: VisitedPlace[];
+  preferences: Preferences;
   created_at: string;
   last_updated: string;
 }
 
 interface UseAuthReturn {
-  user: any;
+  user: unknown;
   profile: UserProfile | null;
   isLoading: boolean;
-  error: any;
+  error: unknown;
   refetchProfile: () => Promise<void>;
-  addVisitedPlace: (placeData: any) => Promise<boolean>;
-  updatePreferences: (preferences: any) => Promise<boolean>;
+  addVisitedPlace: (placeData: VisitedPlace) => Promise<boolean>;
+  updatePreferences: (preferences: Partial<Preferences>) => Promise<boolean>;
 }
 
 export function useAuth(): UseAuthReturn {
@@ -31,7 +41,7 @@ export function useAuth(): UseAuthReturn {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!session?.user) return;
     
     setProfileLoading(true);
@@ -81,9 +91,9 @@ export function useAuth(): UseAuthReturn {
     } finally {
       setProfileLoading(false);
     }
-  };
+  }, [session?.user]);
 
-  const addVisitedPlace = async (placeData: any): Promise<boolean> => {
+  const addVisitedPlace = async (placeData: VisitedPlace): Promise<boolean> => {
     if (!session?.user || !profile) return false;
     
     try {
@@ -116,7 +126,7 @@ export function useAuth(): UseAuthReturn {
     }
   };
 
-  const updatePreferences = async (preferences: any): Promise<boolean> => {
+  const updatePreferences = async (preferences: Partial<Preferences>): Promise<boolean> => {
     if (!session?.user || !profile) return false;
     
     try {
@@ -150,7 +160,7 @@ export function useAuth(): UseAuthReturn {
     } else {
       setProfile(null);
     }
-  }, [session?.user]);
+  }, [session?.user, fetchProfile]);
 
   return {
     user: session?.user,

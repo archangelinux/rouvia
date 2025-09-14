@@ -61,7 +61,7 @@ function LocationSearchModal({ location, onSave, onClose }: LocationSearchModalP
         
         // Check if data has features array
         if (data.features && Array.isArray(data.features)) {
-          const places = data.features.map((f: any) => f.place_name);
+          const places = data.features.map((f: { place_name: string }) => f.place_name);
           setResults(places);
         } else {
           console.warn("Unexpected Mapbox API response format:", data);

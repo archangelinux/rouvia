@@ -4,98 +4,101 @@ import Image from 'next/image';
 import { signIn } from 'next-auth/react';
 
 export default function LandingPage() {
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center relative overflow-hidden">
-      {/* Cityscape Background */}
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-800/50 via-transparent to-transparent"></div>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background placeholder */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-100"></div>
       
-      {/* Animated cityscape silhouette */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-700 to-transparent">
-        <div className="flex justify-between items-end h-full px-4">
-          <div className="w-8 h-20 bg-slate-600 rounded-t"></div>
-          <div className="w-6 h-16 bg-slate-600 rounded-t"></div>
-          <div className="w-10 h-24 bg-slate-600 rounded-t"></div>
-          <div className="w-7 h-18 bg-slate-600 rounded-t"></div>
-          <div className="w-5 h-14 bg-slate-600 rounded-t"></div>
-          <div className="w-9 h-22 bg-slate-600 rounded-t"></div>
-          <div className="w-6 h-16 bg-slate-600 rounded-t"></div>
-          <div className="w-8 h-20 bg-slate-600 rounded-t"></div>
-          <div className="w-4 h-12 bg-slate-600 rounded-t"></div>
-          <div className="w-7 h-18 bg-slate-600 rounded-t"></div>
-        </div>
-      </div>
+      {/* Left green edge */}
+      <div className="absolute left-0 top-8 bottom-8 w-16 bg-green-500 rounded-r-full opacity-20"></div>
+      
+      {/* Right green edge */}
+      <div className="absolute right-0 top-8 bottom-8 w-16 bg-green-500 rounded-l-full opacity-20"></div>
+      
+      {/* Content - properly centered */}
+      <div className="min-h-screen flex items-center justify-center py-12">
+        <div className="max-w-4xl w-full mx-4 relative z-10">
+          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
+            
+            {/* Left Side - Logo and Content */}
+            <div className="flex-1 text-center lg:text-left space-y-8">
+              {/* Logo */}
+              <div className="flex justify-center lg:justify-start">
+                <div className="w-55 h-55 relative mb-[-50]">
+                  <Image
+                    src="/logo.png"
+                    alt="Rouvia Logo"
+                    width={120}
+                    height={120}
+                    className="w-full h-full object-contain drop-shadow-xl"
+                    priority
+                  />
+                </div>
+              </div>
 
-      {/* Floating map elements */}
-      <div className="absolute top-20 left-10 w-16 h-16 bg-blue-500/20 rounded-full animate-pulse"></div>
-      <div className="absolute top-40 right-20 w-12 h-12 bg-green-500/20 rounded-full animate-pulse delay-1000"></div>
-      <div className="absolute bottom-40 left-20 w-20 h-20 bg-purple-500/20 rounded-full animate-pulse delay-2000"></div>
+              {/* Title */}
+              <div>
+                <h1 className="text-3xl lg:text-4xl font-bold text-gray-600 mb-6">
+                  You can go anywhere.
+                </h1>
+                <p className="text-gray-700 text-base lg:text-lg leading-relaxed max-w-lg mx-auto lg:mx-0">
+                  An AI-powered driving companion that optimizes your route and curates sidequests. 
+                  Get where you need to go, and discover where you didn&apos;t know you wanted to.
+                </p>
+              </div>
 
-      <div className="max-w-md w-full mx-4 relative z-10">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="w-24 h-24 mx-auto mb-6 relative">
-            <Image
-              src="/logo.png"
-              alt="Rouvia Logo"
-              width={96}
-              height={96}
-              className="w-full h-full object-contain"
-              priority
-            />
+              {/* Features */}
+              <div className="space-y-5 max-w-lg mx-auto lg:mx-0">
+                <div className="flex items-start text-gray-800">
+                  <div className="w-4 h-4 bg-emerald-400 rounded-full mr-4 mt-1 flex-shrink-0 shadow-lg animate-pulse" 
+                       style={{boxShadow: '0 0 20px rgba(52, 211, 153, 0.4)'}}></div>
+                  <span className="text-sm font-medium">Voice-powered navigation for hands-free driving</span>
+                </div>
+                <div className="flex items-start text-gray-800">
+                  <div className="w-4 h-4 bg-sky-400 rounded-full mr-4 mt-1 flex-shrink-0 shadow-lg animate-pulse" 
+                       style={{boxShadow: '0 0 20px rgba(56, 189, 248, 0.4)', animationDelay: '0.5s'}}></div>
+                  <span className="text-sm font-medium">Smart route optimization and trends discovery</span>
+                </div>
+                <div className="flex items-start text-gray-800">
+                  <div className="w-4 h-4 bg-violet-400 rounded-full mr-4 mt-1 flex-shrink-0 shadow-lg animate-pulse" 
+                       style={{boxShadow: '0 0 20px rgba(139, 92, 246, 0.4)', animationDelay: '1s'}}></div>
+                  <span className="text-sm font-medium">Personalized recommendations and commands</span>
+                </div>
+              </div>
+
+              {/* Login Button */}
+              <div className="flex justify-center lg:justify-start">
+                <div className="text-center lg:text-left">
+                  <button
+                    onClick={() => signIn('auth0', { callbackUrl: '/' })}
+                    className="inline-block bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold px-8 py-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-green-500/25 hover:scale-105 text-base"
+                  >
+                    Get Started
+                  </button>
+                  <p className="text-gray-600 text-xs mt-5 font-medium">
+                    Sign in to start planning your perfect route
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side - Hero Image */}
+            <div className="flex-1 flex justify-center lg:justify-end">
+              <div className="w-80 max-w-sm">
+                <div className="relative">
+                  <Image
+                    src="/hero-image-2.png"
+                    alt="Rouvia Hero Image"
+                    width={150}
+                    height={225}
+                    className="w-full h-auto object-contain drop-shadow-2xl"
+                    priority
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <h1 className="text-5xl font-bold text-white mb-3 tracking-tight">Rouvia</h1>
-          <p className="text-blue-200 text-lg font-medium">Smart Route Planning</p>
         </div>
-
-        {/* Description */}
-        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 mb-8 border border-white/20">
-          <h2 className="text-2xl font-bold text-white mb-4">Welcome to Rouvia</h2>
-          <p className="text-blue-100 leading-relaxed text-lg">
-            Your AI-powered navigation assistant for hands-free driving. 
-            Plan routes, discover places, and navigate with voice commands.
-          </p>
-        </div>
-
-        {/* Features */}
-        <div className="space-y-4 mb-8">
-          <div className="flex items-center text-white">
-            <div className="w-3 h-3 bg-green-400 rounded-full mr-4"></div>
-            <span className="text-lg">Voice-powered navigation</span>
-          </div>
-          <div className="flex items-center text-white">
-            <div className="w-3 h-3 bg-blue-400 rounded-full mr-4"></div>
-            <span className="text-lg">Smart route optimization</span>
-          </div>
-          <div className="flex items-center text-white">
-            <div className="w-3 h-3 bg-purple-400 rounded-full mr-4"></div>
-            <span className="text-lg">Personalized recommendations</span>
-          </div>
-        </div>
-
-        {/* Login Button */}
-        <div className="text-center">
-          <button
-            onClick={() => signIn('auth0', { callbackUrl: '/' })}
-            className="inline-block bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold px-10 py-5 rounded-2xl transition-all duration-300 shadow-2xl hover:shadow-green-500/25 hover:scale-105 text-lg"
-          >
-            Get Started
-          </button>
-          <p className="text-blue-200 text-sm mt-6 font-medium">
-            Sign in to start planning your perfect route
-          </p>
-        </div>
-      </div>
-
-      {/* Subtle grid pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="h-full w-full" style={{
-          backgroundImage: `
-            linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
-          `,
-          backgroundSize: '50px 50px'
-        }}></div>
       </div>
     </div>
   );

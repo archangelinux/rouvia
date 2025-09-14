@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { Home, Plus, LogOut, X, User } from 'lucide-react';
+import { Plus, LogOut, X, User } from 'lucide-react';
+import Image from 'next/image';
 import ProfileDetails from './ProfileDetails';
 
 export default function UserProfile() {
@@ -32,12 +33,14 @@ export default function UserProfile() {
       {/* Profile Circle */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-lg font-semibold shadow-lg hover:shadow-xl transition-shadow duration-200 cursor-pointer overflow-hidden"
+        className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white text-sm font-medium shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer overflow-hidden border border-slate-500"
       >
-        {(user as any).picture ? (
-          <img 
-            src={(user as any).picture} 
+        {(user as { picture?: string }).picture ? (
+          <Image 
+            src={(user as { picture?: string }).picture!} 
             alt={user.name || 'User'} 
+            width={40}
+            height={40}
             className="w-full h-full rounded-full object-cover" 
           />
         ) : (
@@ -65,11 +68,13 @@ export default function UserProfile() {
             
             {/* Profile Section */}
             <div className="flex flex-col items-center space-y-3">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl font-semibold overflow-hidden">
-                {(user as any).picture ? (
-                  <img 
-                    src={(user as any).picture} 
+              <div className="w-16 h-16 rounded-full bg-slate-600 flex items-center justify-center text-white text-xl font-medium overflow-hidden border border-slate-500 shadow-md">
+                {(user as { picture?: string }).picture ? (
+                  <Image 
+                    src={(user as { picture?: string }).picture!} 
                     alt={user.name || 'User'} 
+                    width={64}
+                    height={64}
                     className="w-full h-full rounded-full object-cover" 
                   />
                 ) : (

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -12,7 +12,7 @@ import RoutePlanningPanel from "@/components/RoutePlanningPanel";
 import { RouteProvider } from "@/components/context/route-context";
 
 export default function Home() {
-  const [chatOpen, setChatOpen] = useState(true);
+  const chatOpen = true; // Chat is always open for now
   const { data: session, status } = useSession();
   const router = useRouter();
 
