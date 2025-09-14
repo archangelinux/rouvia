@@ -130,36 +130,38 @@ def _build_payload(
         }
     return payload
 
-# ...existing code...
-
 def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
     """
     intent expects keys:
-      - queries: List[str]  (or "categories")
+      - queries: List[str] or List[List[str]]  (or "categories")
       - lat, lng, radius_m (optional)
       - open_now (optional)
       - min_rating (optional)
       - max_results (optional)
     """
-    queries = intent.get("queries") or intent.get("categories") or []
+    queries = intent.get("queries") or intent.get("categories") or intent.get("place_types") or []
     if isinstance(queries, str):
         queries = [queries]
-    queries = [q for q in (q.strip() for q in queries) if q]
-
+    
+    # Handle nested arrays as combined context terms for the same destination
+    # For example: [['italian restaurant', 'pasta', 'romantic'], 'museum'] means:
+    # - Destination 1: search for 'italian restaurant pasta romantic' (combined)
+    # - Destination 2: search for 'museum'
+    
     lat = intent.get("lat")
     lng = intent.get("lng")
     radius_m = intent.get("radius_m", None)
     open_now = intent.get("open_now", None)
     min_rating = intent.get("min_rating", None)
-    max_results = int(intent.get("max_results", 60))  # Increased to allow all queries
-    results_per_query = max(10, max_results // len(queries))  # Distribute results across queries
+    max_results = int(intent.get("max_results", 60))
+    results_per_destination = max(10, max_results // len(queries))
 
     print(f"🔍 Google Places Search Debug:")
-    print(f"   Queries: {queries}")
+    print(f"   Destinations: {len(queries)}")
     print(f"   Location: {lat}, {lng}")
     print(f"   Radius: {radius_m}m")
     print(f"   Max results: {max_results}")
-    print(f"   Results per query: {results_per_query}")
+    print(f"   Results per destination: {results_per_destination}")
 
     if not queries:
         raise ValueError(
@@ -169,22 +171,31 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
     seen: set[str] = set()
     out: List[PlaceCandidate] = []
 
-    for q in queries:
-        print(f"\n🔎 Searching for: '{q}'")
+    for i, destination in enumerate(queries):
+        print(f"\n🎯 Destination {i+1}: {destination}")
+        
+        # Handle both single strings and arrays of context terms
+        if isinstance(destination, str):
+            search_query = destination
+        else:
+            # Combine all terms into a single contextual search query
+            search_query = ' '.join(destination)
+        
+        print(f"🔎 Combined search query: '{search_query}'")
         
         # Make the query human-like to improve text search quality
-        text_query = q
+        text_query = search_query
         if lat is not None and lng is not None:
-            # "near me" tends to work well with a location bias
-            text_query = f"best {q} near me"
+            text_query = f"best {search_query} near me"
 
-        print(f"   Text query: '{text_query}'")
+        print(f"   Final text query: '{text_query}'")
         payload = _build_payload(text_query, lat, lng, radius_m, open_now)
 
-        # paginate until we hit our cap per query or no nextPageToken
+        # Search for this destination
         page_token = None
-        query_results = 0
-        while query_results < results_per_query:  # Limit per query, not total
+        destination_results = 0
+        
+        while destination_results < results_per_destination:
             if page_token:
                 payload["pageToken"] = page_token
             data = _search_text_page(payload)
@@ -199,7 +210,7 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
                 cand = PlaceCandidate.from_api(p)
 
                 # Print each candidate
-                print(f"   📍 {cand.name} - Types: {cand.types} - Rating: {cand.rating} - Location: {cand.lat},{cand.lng}")
+                print(f"   📍 {cand.name} - Types: {cand.types} - Rating: {cand.rating}")
 
                 # filter by rating if configured
                 if (
@@ -212,21 +223,21 @@ def search(intent: Dict[str, Any]) -> List[PlaceCandidate]:
 
                 out.append(cand)
                 seen.add(pid)
-                query_results += 1
-                if query_results >= results_per_query:
+                destination_results += 1
+                
+                if destination_results >= results_per_destination:
                     break
 
-            if query_results >= results_per_query:
+            if destination_results >= results_per_destination:
                 break
 
             page_token = data.get("nextPageToken")
             if not page_token:
                 break
 
-            # tiny pause; nextPageToken sometimes needs a moment before it becomes valid
             time.sleep(0.5)
-
-        print(f"   ✅ Found {query_results} results for '{q}'")
+        
+        print(f"🎯 Total results for destination {i+1}: {destination_results}")
 
     print(f"\n📊 Total candidates found: {len(out)}")
     
