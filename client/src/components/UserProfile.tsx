@@ -2,9 +2,16 @@
 
 import { useState } from 'react';
 import { Home, Plus, LogOut, X } from 'lucide-react';
+import ProfileDetails from './ProfileDetails';
 
 export default function UserProfile() {
   const [isOpen, setIsOpen] = useState(false);
+  const [showProfileDetails, setShowProfileDetails] = useState(false);
+
+  // Show ProfileDetails page if requested
+  if (showProfileDetails) {
+    return <ProfileDetails onClose={() => setShowProfileDetails(false)} />;
+  }
 
   return (
     <div className="relative">
@@ -44,7 +51,13 @@ export default function UserProfile() {
           {/* Menu Items */}
           <div className="space-y-3 mt-4">
             {/* Profile Details Card */}
-            <button className="w-full text-left bg-white rounded-2xl px-6 py-5 flex items-center space-x-4 transition-colors duration-150">
+            <button 
+              onClick={() => {
+                setShowProfileDetails(true);
+                setIsOpen(false);
+              }}
+              className="w-full text-left bg-white rounded-2xl px-6 py-5 flex items-center space-x-4 transition-colors duration-150"
+            >
               <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
                 <Home size={20} className="text-white" />
               </div>
