@@ -24,7 +24,8 @@ class SidequestRequest(BaseModel):
 
 class SidequestActivity(BaseModel):
     title: str
-    location: str
+    lat: float
+    lon: float
     start_time: Optional[str]
     duration_hours: float
     cost: Optional[float]

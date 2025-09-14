@@ -86,6 +86,12 @@ async def fetch_and_prepare_sidequests(
                 print(f"[Sidequest] No structured data for candidate: {candidate.get('raw_name', 'Unknown')}")
                 continue
         
+        # Ensure coordinates are present
+        if not activity.get("lat") or not activity.get("lon"):
+            print(f"[Sidequest] Warning: Missing coordinates for {activity.get('title', 'Unknown')}, using fallback")
+            activity["lat"] = lat + (0.001 * i)  # Small offset as fallback
+            activity["lon"] = lon + (0.001 * i)
+        
         # Add metadata for structured processing
         activity["place_id"] = place_id
         activity["raw_name"] = candidate.get("raw_name", "Unknown")
@@ -113,6 +119,13 @@ async def fetch_and_prepare_sidequests(
         energy=energy,
         indoor_outdoor=indoor_outdoor
     )
+    
+    # Ensure all activities in the itinerary have lat/lon coordinates
+    for activity in itinerary_result.get("itinerary", []):
+        if not activity.get("lat") or not activity.get("lon"):
+            print(f"[Sidequest] Warning: Activity {activity.get('title', 'Unknown')} missing coordinates")
+            activity["lat"] = lat
+            activity["lon"] = lon
     
     print(f"[Sidequest] Generated structured itinerary with {len(itinerary_result['itinerary'])} activities")
     print(f"[Sidequest] Summary: {itinerary_result['summary']}")
