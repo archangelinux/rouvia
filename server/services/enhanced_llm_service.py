@@ -116,20 +116,100 @@ def parse_intent_with_rag(
             unmatched_words = [word for word in ambiguous_words if word not in matched_keyword_names]
             print(f"[Enhanced LLM] Unmatched words (will use Google Places): {unmatched_words}")
     
-    # Step 3: Use standard Gemini parsing for ALL words (including unmatched ones)
+    # Step 3: Parse complete order of ALL locations (personal + general)
+    complete_order = _parse_complete_location_order(text, rag_matches, ambiguous_words)
+    
+    # Step 4: Use standard Gemini parsing for unmatched words
     standard_intent = _parse_intent_standard(starting_location, text)
     
-    # Step 4: Enhance the intent with RAG matches
+    # Step 5: Enhance the intent with RAG matches and complete order
     enhanced_intent = _enhance_intent_with_rag(
         standard_intent, 
         rag_matches, 
         unmatched_words,
         text,
         order_preserved,
-        wants_alternatives
+        wants_alternatives,
+        complete_order
     )
     
     return enhanced_intent
+
+def _parse_complete_location_order(text: str, rag_matches: List[Dict[str, Any]], ambiguous_words: List[str]) -> List[Dict[str, Any]]:
+    """
+    Parse the complete order of ALL locations mentioned (personal + general) using Gemini
+    """
+    try:
+        # Create a list of all mentioned locations
+        all_locations = []
+        
+        # Add personal locations from RAG matches
+        for match in rag_matches:
+            all_locations.append({
+                "type": "personal",
+                "keyword": match['keyword'],
+                "name": match['location_data']['name'],
+                "source": "user_keyword"
+            })
+        
+        # Add general locations from ambiguous words
+        for word in ambiguous_words:
+            all_locations.append({
+                "type": "general", 
+                "keyword": word,
+                "name": word,
+                "source": "google_places"
+            })
+        
+        if not all_locations:
+            return []
+        
+        # Use Gemini to determine the order
+        system_rules = """
+        You are a location order parser. Your job is to analyze user text and determine the ORDER in which locations should be visited.
+        
+        Return a JSON array of location objects in the order they should be visited, with:
+        - "keyword": the keyword/term mentioned
+        - "type": "personal" or "general" 
+        - "order_index": the position in the sequence (0-based)
+        - "reasoning": why this location comes at this position
+        
+        Look for order indicators:
+        - "then", "after", "next" = sequential order
+        - "first", "before" = priority order
+        - "and" = simultaneous or sequential depending on context
+        
+        Examples:
+        - "I go to work then buy chicken" → [{"keyword": "work", "type": "personal", "order_index": 0}, {"keyword": "chicken", "type": "general", "order_index": 1}]
+        - "I go to work but first I will get chicken" → [{"keyword": "chicken", "type": "general", "order_index": 0}, {"keyword": "work", "type": "personal", "order_index": 1}]
+        """
+        
+        locations_str = json.dumps(all_locations)
+        prompt = f"{system_rules}\nUser text: {text}\nAll mentioned locations: {locations_str}"
+        
+        client = _get_gemini_client()
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config={"response_mime_type": "application/json"},
+        )
+        
+        result = json.loads(response.text)
+        print(f"[Complete Order] Parsed order: {result}")
+        return result
+        
+    except Exception as e:
+        print(f"[Complete Order] Error parsing order: {str(e)}")
+        # Fallback: return locations in the order they appear in text
+        fallback_order = []
+        for i, location in enumerate(all_locations):
+            fallback_order.append({
+                "keyword": location["keyword"],
+                "type": location["type"],
+                "order_index": i,
+                "reasoning": "fallback_order"
+            })
+        return fallback_order
 
 def _identify_ambiguous_words(text: str) -> List[str]:
     """
@@ -210,7 +290,8 @@ def _enhance_intent_with_rag(
     unmatched_words: List[str],
     original_text: str,
     order_preserved: bool = True,
-    wants_alternatives: bool = False
+    wants_alternatives: bool = False,
+    complete_order: List[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Enhance the standard intent with RAG keyword matches and handle unmatched words
@@ -223,9 +304,54 @@ def _enhance_intent_with_rag(
     enhanced_intent["has_personal_locations"] = len(rag_matches) > 0
     enhanced_intent["order_preserved"] = order_preserved
     enhanced_intent["wants_alternatives"] = wants_alternatives
+    enhanced_intent["complete_order"] = complete_order or []
     
-    # Modify place_types to include personal locations IN ORDER
-    if rag_matches:
+    # COMPLETE ORDER PRESERVATION: Create ordered place_types from complete order
+    if complete_order and order_preserved:
+        ordered_place_types = []
+        personal_locations = []
+        
+        # Sort complete order by order_index
+        sorted_order = sorted(complete_order, key=lambda x: x.get('order_index', 0))
+        
+        for location_order in sorted_order:
+            keyword = location_order['keyword']
+            location_type = location_order['type']
+            
+            if location_type == "personal":
+                # Find the personal location data
+                personal_match = next((match for match in rag_matches if match['keyword'] == keyword), None)
+                if personal_match:
+                    location_data = personal_match['location_data']
+                    location_obj = {
+                        "name": location_data.get('name'),
+                        "address": location_data.get('address'),
+                        "lat": location_data.get('lat'),
+                        "lng": location_data.get('lng'),
+                        "place_id": location_data.get('place_id'),
+                        "keyword": keyword,
+                        "distance_km": personal_match['distance_km'],
+                        "confidence": personal_match['confidence'],
+                        "source": "user_keyword",
+                        "order_index": location_order.get('order_index', 0)
+                    }
+                    ordered_place_types.append(location_obj)
+                    personal_locations.append(location_obj)
+            else:
+                # General location - add as string for Google Places search
+                ordered_place_types.append({
+                    "keyword": keyword,
+                    "type": "general",
+                    "source": "google_places",
+                    "order_index": location_order.get('order_index', 0)
+                })
+        
+        enhanced_intent["place_types"] = ordered_place_types
+        enhanced_intent["personal_locations"] = personal_locations
+        print(f"[Enhanced LLM] Complete order preserved: {[loc.get('keyword', loc.get('name', 'unknown')) for loc in ordered_place_types]}")
+    
+    elif rag_matches:
+        # Fallback: just add personal locations (old behavior)
         personal_locations = []
         for match in rag_matches:
             location_data = match['location_data']
@@ -241,16 +367,10 @@ def _enhance_intent_with_rag(
                 "source": "user_keyword"
             })
         
-        # ORDER PRESERVATION: Replace place_types with ordered personal locations
-        if order_preserved:
-            enhanced_intent["place_types"] = personal_locations
-            print(f"[Enhanced LLM] Order preserved: {[loc['keyword'] for loc in personal_locations]}")
-        else:
-            # If order not preserved, append to existing place_types
-            if "place_types" not in enhanced_intent:
-                enhanced_intent["place_types"] = []
-            enhanced_intent["place_types"].extend(personal_locations)
-        
+        # Append to existing place_types
+        if "place_types" not in enhanced_intent:
+            enhanced_intent["place_types"] = []
+        enhanced_intent["place_types"].extend(personal_locations)
         enhanced_intent["personal_locations"] = personal_locations
     
     # Handle unmatched ambiguous words
@@ -295,18 +415,68 @@ def _generate_unmatched_suggestions(unmatched_words: List[str], original_text: s
 
 def select_stops(intent: dict, candidates: list) -> list:
     """
-    Enhanced stop selection that prioritizes personal locations from RAG matches
-    and preserves order when specified
+    Enhanced stop selection that preserves complete order of ALL locations (personal + general)
     """
-    # Check if we have personal locations
-    personal_locations = intent.get("personal_locations", [])
+    complete_order = intent.get("complete_order", [])
     order_preserved = intent.get("order_preserved", True)
+    personal_locations = intent.get("personal_locations", [])
     
-    if personal_locations:
-        # ORDER PRESERVATION: Use personal locations in the order they were mentioned
+    if complete_order and order_preserved:
+        # COMPLETE ORDER PRESERVATION: Handle both personal and general locations in order
         selected_stops = []
         
-        # Add personal locations in order
+        # Sort by order_index
+        sorted_order = sorted(complete_order, key=lambda x: x.get('order_index', 0))
+        
+        for location_order in sorted_order:
+            keyword = location_order['keyword']
+            location_type = location_order['type']
+            
+            if location_type == "personal":
+                # Use personal location data
+                personal_loc = next((loc for loc in personal_locations if loc['keyword'] == keyword), None)
+                if personal_loc:
+                    selected_stops.append({
+                        "name": personal_loc["name"],
+                        "address": personal_loc["address"],
+                        "lat": personal_loc["lat"],
+                        "lng": personal_loc["lng"],
+                        "place_id": personal_loc["place_id"],
+                        "types": ["personal_location"],
+                        "rating": 5.0,
+                        "user_ratings_total": 1,
+                        "source": "user_keyword",
+                        "keyword": keyword,
+                        "distance_km": personal_loc["distance_km"],
+                        "confidence": personal_loc["confidence"],
+                        "order_index": location_order.get('order_index', 0)
+                    })
+            else:
+                # Find matching candidate from Google Places
+                matching_candidate = next((c for c in candidates if keyword.lower() in c.get('name', '').lower() or 
+                                         any(keyword.lower() in t.lower() for t in c.get('types', []))), None)
+                if matching_candidate:
+                    selected_stops.append({
+                        "name": matching_candidate.get('name'),
+                        "address": matching_candidate.get('address'),
+                        "lat": matching_candidate.get('lat'),
+                        "lng": matching_candidate.get('lng'),
+                        "place_id": matching_candidate.get('place_id'),
+                        "types": matching_candidate.get('types', []),
+                        "rating": matching_candidate.get('rating', 0),
+                        "user_ratings_total": matching_candidate.get('user_ratings_total', 0),
+                        "source": "google_places",
+                        "keyword": keyword,
+                        "order_index": location_order.get('order_index', 0)
+                    })
+        
+        print(f"[Enhanced LLM] Complete order preserved: {[stop.get('keyword', stop.get('name', 'unknown')) for stop in selected_stops]}")
+        return selected_stops
+    
+    elif personal_locations:
+        # Fallback: Use personal locations only (old behavior)
+        selected_stops = []
+        
         for personal_loc in personal_locations:
             selected_stops.append({
                 "name": personal_loc["name"],
@@ -314,8 +484,8 @@ def select_stops(intent: dict, candidates: list) -> list:
                 "lat": personal_loc["lat"],
                 "lng": personal_loc["lng"],
                 "place_id": personal_loc["place_id"],
-                "types": ["personal_location"],  # Required field
-                "rating": 5.0,  # Default high rating for personal locations
+                "types": ["personal_location"],
+                "rating": 5.0,
                 "user_ratings_total": 1,
                 "source": "user_keyword",
                 "keyword": personal_loc["keyword"],
@@ -323,12 +493,7 @@ def select_stops(intent: dict, candidates: list) -> list:
                 "confidence": personal_loc["confidence"]
             })
         
-        # If order is preserved, personal locations are the complete route
-        if order_preserved:
-            print(f"[Enhanced LLM] Order preserved - using only personal locations: {[loc['keyword'] for loc in personal_locations]}")
-            return selected_stops
-        
-        # If order not preserved, add remaining stops from standard selection
+        # Add remaining stops from standard selection
         remaining_intent = intent.copy()
         remaining_intent["place_types"] = [pt for pt in intent.get("place_types", []) 
                                         if not isinstance(pt, dict) or pt.get("source") != "user_keyword"]

@@ -58,28 +58,38 @@ async def test_order_preservation():
         {
             "text": "I go to work then buy chicken",
             "expected_order": ["work", "chicken"],
-            "description": "Sequential order: work first, then chicken"
+            "description": "Sequential order: personal work first, then general chicken"
         },
         {
             "text": "I go to work but first I will get chicken",
             "expected_order": ["chicken", "work"],
-            "description": "Reverse order: chicken first, then work"
+            "description": "Reverse order: general chicken first, then personal work"
         },
         {
             "text": "Take me to my coffee shop",
             "expected_order": ["coffee"],
-            "description": "Single location, no alternatives needed"
+            "description": "Single personal location, no alternatives needed"
         },
         {
             "text": "I'm feeling like a different coffee place today",
             "expected_order": ["coffee"],
             "wants_alternatives": True,
-            "description": "Single location but wants alternatives"
+            "description": "Single personal location but wants alternatives"
         },
         {
             "text": "I need to get coffee then go to work",
             "expected_order": ["coffee", "work"],
-            "description": "Coffee first, then work"
+            "description": "Personal coffee first, then personal work"
+        },
+        {
+            "text": "I want to buy chicken then go to work then get coffee",
+            "expected_order": ["chicken", "work", "coffee"],
+            "description": "Mixed order: general chicken, personal work, personal coffee"
+        },
+        {
+            "text": "First I'll get coffee, then buy chicken, and finally go to work",
+            "expected_order": ["coffee", "chicken", "work"],
+            "description": "Explicit order: personal coffee, general chicken, personal work"
         }
     ]
     
@@ -104,6 +114,7 @@ async def test_order_preservation():
             order_preserved = result.get('order_preserved', False)
             wants_alternatives = result.get('wants_alternatives', False)
             personal_locations = result.get('personal_locations', [])
+            complete_order = result.get('complete_order', [])
             
             print(f"   🔍 Analysis Results:")
             print(f"      RAG Matches: {len(rag_matches)}")
@@ -113,13 +124,25 @@ async def test_order_preservation():
             print(f"      Order Preserved: {order_preserved}")
             print(f"      Wants Alternatives: {wants_alternatives}")
             print(f"      Personal Locations: {len(personal_locations)}")
+            print(f"      Complete Order: {len(complete_order)}")
             
-            # Check order
-            matched_keywords = [match['keyword'] for match in rag_matches]
-            if matched_keywords == test_case['expected_order']:
-                print(f"   🎯 PERFECT ORDER MATCH!")
+            # Check complete order
+            if complete_order:
+                sorted_order = sorted(complete_order, key=lambda x: x.get('order_index', 0))
+                order_keywords = [loc['keyword'] for loc in sorted_order]
+                print(f"        Complete order keywords: {order_keywords}")
+                
+                if order_keywords == test_case['expected_order']:
+                    print(f"   🎯 PERFECT COMPLETE ORDER MATCH!")
+                else:
+                    print(f"   ⚠️  COMPLETE ORDER MISMATCH (expected: {test_case['expected_order']}, got: {order_keywords})")
             else:
-                print(f"   ⚠️  ORDER MISMATCH (expected: {test_case['expected_order']}, got: {matched_keywords})")
+                # Fallback: check RAG matches order
+                matched_keywords = [match['keyword'] for match in rag_matches]
+                if matched_keywords == test_case['expected_order']:
+                    print(f"   🎯 PERFECT RAG ORDER MATCH!")
+                else:
+                    print(f"   ⚠️  RAG ORDER MISMATCH (expected: {test_case['expected_order']}, got: {matched_keywords})")
             
             # Check alternatives flag
             if test_case.get('wants_alternatives', False) == wants_alternatives:
