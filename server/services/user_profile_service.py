@@ -157,6 +157,11 @@ def create_or_update_auth0_user_profile(
         if family_name:
             update_data["family_name"] = family_name
         
+        # Ensure keywords field exists for existing users
+        if "keywords" not in existing_profile:
+            update_data["keywords"] = {}
+            print(f"[User Profile] Added missing keywords field for existing user: {auth0_user_id}")
+        
         user_profiles_col.update_one(
             {"auth0_user_id": auth0_user_id},
             {"$set": update_data}
@@ -251,3 +256,35 @@ def delete_keyword(auth0_user_id: str, keyword: str):
     )
     
     print(f"[User Profile] Removed keyword '{keyword}' for user: {auth0_user_id}")
+
+def migrate_existing_users_add_keywords():
+    """
+    Migration function to add keywords field to existing users who don't have it
+    """
+    try:
+        # Find all users without keywords field
+        users_without_keywords = user_profiles_col.find({
+            "auth0_user_id": {"$exists": True},
+            "keywords": {"$exists": False}
+        })
+        
+        count = 0
+        for user in users_without_keywords:
+            user_profiles_col.update_one(
+                {"_id": user["_id"]},
+                {
+                    "$set": {
+                        "keywords": {},
+                        "last_updated": datetime.now().isoformat()
+                    }
+                }
+            )
+            count += 1
+            print(f"[Migration] Added keywords field to user: {user.get('auth0_user_id', 'unknown')}")
+        
+        print(f"[Migration] Successfully migrated {count} users to include keywords field")
+        return count
+        
+    except Exception as e:
+        print(f"[Migration] Error during keywords migration: {str(e)}")
+        return 0

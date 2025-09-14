@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { logout } from '@/lib/auth0';
 import { X, Plus, Edit, Trash2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -212,7 +213,7 @@ function LocationSearchModal({ location, keyword, onSave, onClose }: LocationSea
               </div>
             )}
             
-            {results.length > 0 && (
+            {results.length > 0 && !selectedLocation && (
               <div className="mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                 {results.map((place, index) => (
                   <div
@@ -231,6 +232,26 @@ function LocationSearchModal({ location, keyword, onSave, onClose }: LocationSea
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {selectedLocation && (
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Selected Location:</p>
+                    <p className="text-sm text-green-700">{selectedLocation.place_name}</p>
+                    <p className="text-xs text-green-600">
+                      Lat: {selectedLocation.center[1].toFixed(4)}, Lng: {selectedLocation.center[0].toFixed(4)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedLocation(null)}
+                    className="text-green-600 hover:text-green-800 text-sm"
+                  >
+                    Change
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -416,7 +437,7 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
               </div>
             )}
             
-            {results.length > 0 && (
+            {results.length > 0 && !selectedLocation && (
               <div className="mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                 {results.map((place, index) => (
                   <div
@@ -424,7 +445,10 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
                     className={`p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 ${
                       selectedLocation?.place_name === place.place_name ? 'bg-blue-50 border-blue-200' : ''
                     }`}
-                    onClick={() => setSelectedLocation(place)}
+                    onClick={() => {
+                      setQuery(place.place_name);
+                      setSelectedLocation(place);
+                    }}
                   >
                     <div className="font-medium">{place.place_name}</div>
                     <div className="text-sm text-gray-500">
@@ -432,6 +456,26 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {selectedLocation && (
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Selected Location:</p>
+                    <p className="text-sm text-green-700">{selectedLocation.place_name}</p>
+                    <p className="text-xs text-green-600">
+                      Lat: {selectedLocation.center[1].toFixed(4)}, Lng: {selectedLocation.center[0].toFixed(4)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedLocation(null)}
+                    className="text-green-600 hover:text-green-800 text-sm"
+                  >
+                    Change
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -457,6 +501,7 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
 }
 
 export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
+  const { user: auth0User, logout } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingLocation, setEditingLocation] = useState<{keyword: string, location: Location} | null>(null);
@@ -466,13 +511,20 @@ export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
   // Load user profile from MongoDB
   useEffect(() => {
     const loadUserProfile = async () => {
+      if (!auth0User?.sub) {
+        setError('Please log in to view your profile');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const response = await fetch('/api/user-profile');
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${apiUrl}/api/user-profile/${auth0User.sub}`);
         
         if (!response.ok) {
-          if (response.status === 401) {
-            setError('Please log in to view your profile');
+          if (response.status === 404) {
+            setError('Profile not found. Please try logging in again.');
             return;
           }
           throw new Error('Failed to load profile');
@@ -489,15 +541,21 @@ export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
     };
 
     loadUserProfile();
-  }, []);
+  }, [auth0User?.sub]);
 
   const handleEditLocation = (keyword: string, location: Location) => {
     setEditingLocation({ keyword, location });
   };
 
   const handleSaveLocation = async (keyword: string, updatedLocation: Location) => {
+    if (!auth0User?.sub) {
+      alert('Please log in to save locations');
+      return;
+    }
+
     try {
-      const response = await fetch('/api/user-profile', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/user-profile/${auth0User.sub}/keywords`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -537,12 +595,18 @@ export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
   };
 
   const handleDeleteLocation = async (keyword: string) => {
+    if (!auth0User?.sub) {
+      alert('Please log in to delete locations');
+      return;
+    }
+
     if (!confirm(`Are you sure you want to delete the "${keyword}" location?`)) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/user-profile?keyword=${encodeURIComponent(keyword)}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/user-profile/${auth0User.sub}/keywords/${encodeURIComponent(keyword)}`, {
         method: 'DELETE',
       });
 

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Mic, Send, MessageCircle, Settings } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import { useRoute, type PlaceStop } from "@/components/context/route-context";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ChatMessage {
   id: string;
@@ -41,8 +42,8 @@ export default function ChatInterface({ userSub }: ChatInterfaceProps) {
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const API_URL_AUDIO = "http://localhost:8000/plan-route-audio";
-  const API_URL_TEXT = "http://localhost:8000/plan-route-text";
+  const API_URL_AUDIO = "http://localhost:8000/enhanced-plan-route-audio";
+  const API_URL_TEXT = "http://localhost:8000/enhanced-plan-route-text";
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -121,7 +122,7 @@ export default function ChatInterface({ userSub }: ChatInterfaceProps) {
     setMessages(prev => prev.filter(m => m.id !== loadingId));
   };
 
-  // Typed message -> POST /plan-route-text (JSON)
+  // Typed message -> POST /plan-route-text (JSON) or enhanced endpoint
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
@@ -163,8 +164,23 @@ export default function ChatInterface({ userSub }: ChatInterfaceProps) {
 
       pushStopsToContext(result.stops);
 
-      const botReply =
-        result.reply || result.response || result.message || result.text;
+      // Enhanced response handling
+      let botReply = result.reply || result.response || result.message || result.text;
+      
+      if (result.enhanced_metadata) {
+        const metadata = result.enhanced_metadata;
+        const personalLocations = metadata.personal_locations || [];
+        const suggestions = metadata.unmatched_suggestions || [];
+        
+        if (personalLocations.length > 0) {
+          botReply += `\n\n🎯 Found ${personalLocations.length} personal location(s): ${personalLocations.map(loc => loc.name).join(', ')}`;
+        }
+        
+        if (suggestions.length > 0) {
+          botReply += `\n\n💡 Suggestions: ${suggestions.map(s => s.suggestion).join('; ')}`;
+        }
+      }
+      
       if (botReply)
         appendMessage({ text: String(botReply), role: "assistant" });
     } catch (err) {
@@ -267,7 +283,23 @@ export default function ChatInterface({ userSub }: ChatInterfaceProps) {
 
             pushStopsToContext(result.stops);
 
-            const botReply: string = result.message || "";
+            // Enhanced response handling for voice
+            let botReply: string = result.message || "";
+            
+            if (result.enhanced_metadata) {
+              const metadata = result.enhanced_metadata;
+              const personalLocations = metadata.personal_locations || [];
+              const suggestions = metadata.unmatched_suggestions || [];
+              
+              if (personalLocations.length > 0) {
+                botReply += `\n\n🎯 Found ${personalLocations.length} personal location(s): ${personalLocations.map(loc => loc.name).join(', ')}`;
+              }
+              
+              if (suggestions.length > 0) {
+                botReply += `\n\n💡 Suggestions: ${suggestions.map(s => s.suggestion).join('; ')}`;
+              }
+            }
+            
             if (botReply) appendMessage({ text: botReply, role: "assistant" });
           } catch (err) {
             replaceMessageText(
@@ -358,6 +390,7 @@ export default function ChatInterface({ userSub }: ChatInterfaceProps) {
           Filters
         </button>
       </div>
+
 
       {/* Content based on mode */}
       {mode === "chat" ? (
