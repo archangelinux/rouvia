@@ -106,8 +106,8 @@ export default function LandingPage() {
       <div className="w-full px-4 py-16 relative z-10 bg-white/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-800 mb-4">See Rouvia in Action</h2>
-            <p className="text-gray-600 text-lg">Experience the power of AI-driven navigation</p>
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">Helping you get the most of your city</h2>
+            <p className="text-gray-600 text-lg">Made for the busy, and the curious.</p>
           </div>
           <div className="space-y-8">
             {/* Screenshot 1 - Full width */}

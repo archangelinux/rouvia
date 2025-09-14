@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Mic, Send, MessageCircle, Settings } from "lucide-react";
+import { Mic, Send, MessageCircle, Sparkles } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import { useRoute, type PlaceStop } from "@/components/context/route-context";
 import { useAuth } from "@/contexts/AuthContext";
@@ -386,8 +386,8 @@ export default function ChatInterface({ userSub }: ChatInterfaceProps) {
               : "text-gray-500 hover:text-gray-700"
           }`}
         >
-          <Settings size={16} className="inline mr-2" />
-          Filters
+          <Sparkles size={16} className="inline mr-2" />
+          Sidequest
         </button>
       </div>
 

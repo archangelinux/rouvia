@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageCircle, Sparkles, Wand2 } from 'lucide-react';
+import { Wand2, Sparkles } from 'lucide-react';
 import { useRoute, type PlaceStop } from "@/components/context/route-context";
 
 interface FilterState {
@@ -99,7 +99,7 @@ export default function FilterPanel() {
       indoor: false,
       outdoor: false,
     },
-    distance: '',
+    distance: '5',
   });
 
   const handleEnergyChange = (value: number) => {
@@ -349,9 +349,9 @@ export default function FilterPanel() {
           </div>
         </div>
 
-        {/* Distance Section */}
+        {/* Sidequest Section */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Distance</label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Max Distance (km)</label>
           <div className="flex items-center space-x-2">
             <input
               type="text"
@@ -360,12 +360,6 @@ export default function FilterPanel() {
               placeholder="(km)"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-green-500"
             />
-            <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-              <MessageCircle size={16} />
-            </button>
-            <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-              <Sparkles size={16} />
-            </button>
           </div>
         </div>
 
