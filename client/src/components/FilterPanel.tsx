@@ -133,17 +133,26 @@ export default function FilterPanel() {
       )
     }
 
+    // Fix: Get selected interests as array of strings
+    const selectedInterests = Object.keys(filters.interests)
+      .filter(key => filters.interests[key as keyof typeof filters.interests]);
+
+    // Fix: Get selected indoor/outdoor preference as string or null
+    const selectedIndoorOutdoor = 
+      filters.indoorOutdoor.indoor && filters.indoorOutdoor.outdoor ? null :
+      filters.indoorOutdoor.indoor ? "indoor" :
+      filters.indoorOutdoor.outdoor ? "outdoor" : null;
+
     const sidequestData = {
       "lat": location.latitude,
       "lon": location.longitude,
       "travel_distance": distanceNumber,
       "start_time": filters.time.start,
       "end_time": filters.time.end,
-      "budget": filters.budget,
-      "interests": Object.keys(filters.interests)
-      .filter(key => String(filters.interests[key as keyof typeof filters.interests])[0]) || "",
+      "budget": filters.budget > 0 ? filters.budget : null,
+      "interests": selectedInterests,
       "energy": filters.energy,
-      "indoor_outdoor": filters.indoorOutdoor.indoor ? "indoor" : "outdoor",
+      "indoor_outdoor": selectedIndoorOutdoor,
       "user_id": "test_user",
     };
 
