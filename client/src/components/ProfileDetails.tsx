@@ -212,7 +212,7 @@ function LocationSearchModal({ location, keyword, onSave, onClose }: LocationSea
               </div>
             )}
             
-            {results.length > 0 && (
+            {results.length > 0 && !selectedLocation && (
               <div className="mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                 {results.map((place, index) => (
                   <div
@@ -231,6 +231,26 @@ function LocationSearchModal({ location, keyword, onSave, onClose }: LocationSea
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {selectedLocation && (
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Selected Location:</p>
+                    <p className="text-sm text-green-700">{selectedLocation.place_name}</p>
+                    <p className="text-xs text-green-600">
+                      Lat: {selectedLocation.center[1].toFixed(4)}, Lng: {selectedLocation.center[0].toFixed(4)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedLocation(null)}
+                    className="text-green-600 hover:text-green-800 text-sm"
+                  >
+                    Change
+                  </button>
+                </div>
               </div>
             )}
           </div>
