@@ -7,7 +7,7 @@ from services.scoring_service import activity_scorer
 from services.enhanced_scraper import trendiness_checker
 
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_CLOUD_API_KEY")
 EVENTBRITE_API_KEY = os.getenv("EVENTBRITE_API_KEY")
 
 

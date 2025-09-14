@@ -10,7 +10,11 @@ async def get_sidequests(request: SidequestRequest):
     Sidequest endpoint: fetch real activities from all sources (Google Places, Luma, blogs),
     filter by user preferences, and return a structured itinerary.
     """
+<<<<<<< HEAD
     print("made it")
+=======
+    print("lol")
+>>>>>>> origin
     results = await fetch_and_prepare_sidequests(
         lat=request.lat,
         lon=request.lon,
