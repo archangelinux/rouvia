@@ -416,7 +416,7 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
               </div>
             )}
             
-            {results.length > 0 && (
+            {results.length > 0 && !selectedLocation && (
               <div className="mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                 {results.map((place, index) => (
                   <div
@@ -424,7 +424,10 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
                     className={`p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 ${
                       selectedLocation?.place_name === place.place_name ? 'bg-blue-50 border-blue-200' : ''
                     }`}
-                    onClick={() => setSelectedLocation(place)}
+                    onClick={() => {
+                      setQuery(place.place_name);
+                      setSelectedLocation(place);
+                    }}
                   >
                     <div className="font-medium">{place.place_name}</div>
                     <div className="text-sm text-gray-500">
@@ -432,6 +435,26 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {selectedLocation && (
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Selected Location:</p>
+                    <p className="text-sm text-green-700">{selectedLocation.place_name}</p>
+                    <p className="text-xs text-green-600">
+                      Lat: {selectedLocation.center[1].toFixed(4)}, Lng: {selectedLocation.center[0].toFixed(4)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedLocation(null)}
+                    className="text-green-600 hover:text-green-800 text-sm"
+                  >
+                    Change
+                  </button>
+                </div>
               </div>
             )}
           </div>
