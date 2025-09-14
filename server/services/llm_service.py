@@ -2,16 +2,18 @@ from google import genai
 import os
 import json
 
+
 def _get_gemini_client() -> genai.Client:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set.")
     return genai.Client(api_key=api_key)
 
+
 def parse_intent(starting_location: str, text: str) -> dict:
     """
     Use Gemini to parse user intent from transcribed text.
-    
+
     Args:
         starting_location: The user's starting location as a string
         text: Transcribed text from user audio input
@@ -32,25 +34,28 @@ def parse_intent(starting_location: str, text: str) -> dict:
         "No extra text. No markdown. No code fences."
     )
 
-    prompt = f"{system_rules}\n Starting location: {starting_location}\n User text: {text}"
+    prompt = (
+        f"{system_rules}\n Starting location: {starting_location}\n User text: {text}"
+    )
 
     client = _get_gemini_client()
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
-        config={"response_mime_type": "application/json"}
+        config={"response_mime_type": "application/json"},
     )
-    
+
     print(f"Gemini raw response: {response.text}")
-    
+
     # Parse the JSON string response into a Python dict
     intent_data = json.loads(response.text)
     return intent_data
 
+
 def select_stops(intent: dict, candidates: list) -> list:
     """
     Use Gemini to select and rank stops from candidate places based on user intent.
-    
+
     Args:
         intent: Parsed intent dictionary from parse_intent()
         candidates: List of candidate places from Google Places API
@@ -74,9 +79,11 @@ def select_stops(intent: dict, candidates: list) -> list:
     # Convert PlaceCandidate objects to dictionaries if needed
     candidates_dict = []
     for candidate in candidates:
-        if hasattr(candidate, '__dict__'):
+        if hasattr(candidate, "__dict__"):
             # Convert Pydantic model to dict
-            candidates_dict.append(candidate.dict() if hasattr(candidate, 'dict') else candidate.__dict__)
+            candidates_dict.append(
+                candidate.dict() if hasattr(candidate, "dict") else candidate.__dict__
+            )
         else:
             # Already a dictionary
             candidates_dict.append(candidate)
@@ -87,14 +94,15 @@ def select_stops(intent: dict, candidates: list) -> list:
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
-        config={"response_mime_type": "application/json"}
+        config={"response_mime_type": "application/json"},
     )
-    
+
     print(f"Gemini raw response for select_stops: {response.text}")
-    
+
     # Parse the JSON string response into a Python list
     stops = json.loads(response.text)
     return stops
+
 
 if __name__ == "__main__":
     sample_starting_location = "University of Waterloo"
