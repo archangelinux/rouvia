@@ -1,10 +1,12 @@
 """
 User profile service for tracking visited places and preferences
+Enhanced to support Auth0 integration
 """
 from typing import List, Dict, Any, Optional
 from services.mongo import user_profiles_col
 from datetime import datetime
 import json
+import hashlib
 
 def get_or_create_user_profile(user_id: str = None) -> Dict[str, Any]:
     """
@@ -115,3 +117,137 @@ def filter_unvisited_activities(activities: List[Dict[str, Any]], user_id: str) 
     
     print(f"[User Profile] Filtered {len(activities)} activities to {len(unvisited)} unvisited activities")
     return unvisited
+
+# Auth0 Integration Functions
+
+def create_or_update_auth0_user_profile(
+    auth0_user_id: str, 
+    email: str, 
+    name: str = None, 
+    nickname: str = None,
+    picture: str = None,
+    given_name: str = None,
+    family_name: str = None
+) -> Dict[str, Any]:
+    """
+    Create or update user profile from Auth0 data
+    """
+    # Check if user already exists
+    existing_profile = user_profiles_col.find_one({"auth0_user_id": auth0_user_id})
+    
+    current_time = datetime.now().isoformat()
+    
+    if existing_profile:
+        # Update existing profile with Auth0 data
+        update_data = {
+            "email": email,
+            "last_login": current_time,
+            "last_updated": current_time
+        }
+        
+        # Add optional fields if provided
+        if name:
+            update_data["name"] = name
+        if nickname:
+            update_data["nickname"] = nickname
+        if picture:
+            update_data["picture"] = picture
+        if given_name:
+            update_data["given_name"] = given_name
+        if family_name:
+            update_data["family_name"] = family_name
+        
+        user_profiles_col.update_one(
+            {"auth0_user_id": auth0_user_id},
+            {"$set": update_data}
+        )
+        
+        print(f"[User Profile] Updated Auth0 profile for user: {auth0_user_id}")
+        return user_profiles_col.find_one({"auth0_user_id": auth0_user_id})
+    
+    else:
+        # Create new profile
+        new_profile = {
+            "auth0_user_id": auth0_user_id,
+            "email": email,
+            "name": name,
+            "nickname": nickname,
+            "picture": picture,
+            "given_name": given_name,
+            "family_name": family_name,
+            "keywords": {},  # JSON field for keyword -> address mapping
+            "visited_places": [],
+            "preferences": {
+                "favorite_cuisines": [],
+                "budget_range": "moderate",
+                "energy_level": 5
+            },
+            "created_at": current_time,
+            "last_login": current_time,
+            "last_updated": current_time
+        }
+        
+        user_profiles_col.insert_one(new_profile)
+        print(f"[User Profile] Created new Auth0 profile for user: {auth0_user_id}")
+        return new_profile
+
+def add_keyword_location(auth0_user_id: str, keyword: str, location_data: Dict[str, Any]):
+    """
+    Add or update a keyword -> location mapping
+    
+    location_data should contain:
+    - name: string (location name)
+    - address: string (full address)
+    - lat: float (latitude)
+    - lng: float (longitude)
+    - place_id: string (optional, for Google Places)
+    """
+    location_entry = {
+        "name": location_data.get("name", keyword),
+        "address": location_data["address"],
+        "lat": location_data["lat"],
+        "lng": location_data["lng"],
+        "place_id": location_data.get("place_id"),
+        "added_at": datetime.now().isoformat()
+    }
+    
+    user_profiles_col.update_one(
+        {"auth0_user_id": auth0_user_id},
+        {
+            "$set": {
+                f"keywords.{keyword}": location_entry,
+                "last_updated": datetime.now().isoformat()
+            }
+        }
+    )
+    
+    print(f"[User Profile] Added keyword '{keyword}' for user: {auth0_user_id}")
+
+def get_user_keywords(auth0_user_id: str) -> Dict[str, Any]:
+    """
+    Get all keyword mappings for a user
+    """
+    profile = user_profiles_col.find_one({"auth0_user_id": auth0_user_id})
+    if profile:
+        return profile.get("keywords", {})
+    return {}
+
+def get_user_profile_by_auth0_id(auth0_user_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get user profile by Auth0 user ID
+    """
+    return user_profiles_col.find_one({"auth0_user_id": auth0_user_id})
+
+def delete_keyword(auth0_user_id: str, keyword: str):
+    """
+    Remove a keyword mapping
+    """
+    user_profiles_col.update_one(
+        {"auth0_user_id": auth0_user_id},
+        {
+            "$unset": {f"keywords.{keyword}": ""},
+            "$set": {"last_updated": datetime.now().isoformat()}
+        }
+    )
+    
+    print(f"[User Profile] Removed keyword '{keyword}' for user: {auth0_user_id}")

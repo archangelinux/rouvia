@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Image from "next/image";
@@ -13,29 +13,29 @@ import { RouteProvider } from "@/components/context/route-context";
 
 export default function Home() {
   const chatOpen = true; // Chat is always open for now
-  const { data: session, status } = useSession();
+  const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     console.log('=== AUTH DEBUG ===');
-    console.log('Session exists:', !!session);
-    console.log('Status:', status);
-    console.log('User:', session?.user);
-    console.log('URL search params:', window.location.search);
-    console.log('Has callbackUrl:', window.location.search.includes('callbackUrl'));
+    console.log('User exists:', !!user);
+    console.log('Is loading:', isLoading);
+    console.log('Is authenticated:', isAuthenticated);
+    console.log('User:', user);
+    console.log('URL:', window.location.href);
     
-    // Redirect to landing page if not authenticated
-    if (status === 'unauthenticated' && !window.location.search.includes('callbackUrl')) {
+    // Only redirect if we're not loading and definitely not authenticated
+    if (!isLoading && !user) {
       console.log('🚀 REDIRECTING TO LANDING PAGE - not authenticated');
       router.push('/landing');
-    } else if (session) {
-      console.log('✅ User authenticated:', session.user);
+    } else if (user) {
+      console.log('✅ User authenticated:', user);
     } else {
-      console.log('⏳ Still loading or other state...');
+      console.log('⏳ Still loading...');
     }
-  }, [session, status, router]);
+  }, [user, isLoading, router]);
 
-  if (status === 'loading') {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-gray-600 text-xl">Loading...</div>
@@ -43,7 +43,7 @@ export default function Home() {
     );
   }
 
-  if (!session) {
+  if (!user) {
     return null; // Will redirect to landing page
   }
 

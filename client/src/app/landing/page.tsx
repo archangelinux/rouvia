@@ -1,9 +1,10 @@
 'use client';
 
 import Image from 'next/image';
-import { signIn } from 'next-auth/react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function LandingPage() {
+  const { login } = useAuth();
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Background placeholder */}
@@ -70,7 +71,7 @@ export default function LandingPage() {
               <div className="flex justify-center lg:justify-start">
                 <div className="text-center lg:text-left">
                   <button
-                    onClick={() => signIn('auth0', { callbackUrl: '/' })}
+                    onClick={() => login()}
                     className="inline-block bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold px-8 py-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-green-500/25 hover:scale-105 text-base"
                   >
                     Get Started

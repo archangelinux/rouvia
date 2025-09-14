@@ -62,3 +62,12 @@ body {
 .animate-char-fade-in {
   animation: char-fade-in 0.3s ease-out;
 }
+
+/* Hide Auth0 development key warning in development */
+.auth0-lock-warning-banner {
+  display: none !important;
+}
+
+.auth0-lock-warning {
+  display: none !important;
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Plus, LogOut, X, User } from 'lucide-react';
 import Image from 'next/image';
 import ProfileDetails from './ProfileDetails';
@@ -9,19 +9,17 @@ import ProfileDetails from './ProfileDetails';
 export default function UserProfile() {
   const [isOpen, setIsOpen] = useState(false);
   const [showProfileDetails, setShowProfileDetails] = useState(false);
-  const { data: session, status } = useSession();
+  const { user, isLoading, logout } = useAuth();
 
-  if (status === 'loading') {
+  if (isLoading) {
     return (
       <div className="w-10 h-10 rounded-full bg-gray-300 animate-pulse"></div>
     );
   }
 
-  if (!session?.user) {
+  if (!user) {
     return null;
   }
-
-  const user = session.user;
 
   // Show ProfileDetails page if requested
   if (showProfileDetails) {
@@ -116,10 +114,8 @@ export default function UserProfile() {
               onClick={async () => {
                 try {
                   console.log('Signing out...');
-                  await signOut({ 
-                    callbackUrl: '/landing',
-                    redirect: true 
-                  });
+                  await logout();
+                  window.location.href = '/landing';
                 } catch (error) {
                   console.error('Sign out error:', error);
                   // Fallback: clear storage and redirect
