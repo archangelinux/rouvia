@@ -166,8 +166,8 @@ function LocationSearchModal({ location, keyword, onSave, onClose }: LocationSea
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-lg p-6 w-96 max-h-96 overflow-y-auto">
+    <div className="fixed inset-0 bg-white bg-opacity-5 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-white rounded-lg p-6 w-[700px] h-[600px] overflow-y-auto shadow-2xl border border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Edit Location</h3>
           <button
@@ -178,8 +178,8 @@ function LocationSearchModal({ location, keyword, onSave, onClose }: LocationSea
           </button>
         </div>
 
-        <div className="space-y-4">
-          <div>
+        <div className="space-y-4 h-[480px] flex flex-col">
+          <div className="h-16">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Location Name
             </label>
@@ -192,7 +192,7 @@ function LocationSearchModal({ location, keyword, onSave, onClose }: LocationSea
             />
           </div>
 
-          <div>
+          <div className="flex-1 flex flex-col">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Address
             </label>
@@ -204,55 +204,57 @@ function LocationSearchModal({ location, keyword, onSave, onClose }: LocationSea
               className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             />
 
-            {!MAPBOX_TOKEN && (
-              <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  <strong>Note:</strong> Location search is disabled. Please enter addresses manually.
-                </p>
-              </div>
-            )}
-            
-            {results.length > 0 && !selectedLocation && (
-              <div className="mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                {results.map((place, index) => (
-                  <div
-                    key={index}
-                    className={`p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                      selectedLocation?.place_name === place.place_name ? 'bg-blue-50 border-blue-200' : ''
-                    }`}
-                    onClick={() => {
-                      setQuery(place.place_name);
-                      setSelectedLocation(place);
-                    }}
-                  >
-                    <div className="font-medium">{place.place_name}</div>
-                    <div className="text-sm text-gray-500">
-                      Lat: {place.center[1].toFixed(4)}, Lng: {place.center[0].toFixed(4)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {selectedLocation && (
-              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-green-800">Selected Location:</p>
-                    <p className="text-sm text-green-700">{selectedLocation.place_name}</p>
-                    <p className="text-xs text-green-600">
-                      Lat: {selectedLocation.center[1].toFixed(4)}, Lng: {selectedLocation.center[0].toFixed(4)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedLocation(null)}
-                    className="text-green-600 hover:text-green-800 text-sm"
-                  >
-                    Change
-                  </button>
+            <div className="flex-1 mt-2 overflow-y-auto">
+              {!MAPBOX_TOKEN && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-2">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Note:</strong> Location search is disabled. Please enter addresses manually.
+                  </p>
                 </div>
-              </div>
-            )}
+              )}
+              
+              {results.length > 0 && !selectedLocation && (
+                <div className="bg-white border border-gray-300 rounded-lg shadow-lg">
+                  {results.map((place, index) => (
+                    <div
+                      key={index}
+                      className={`p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                        selectedLocation?.place_name === place.place_name ? 'bg-blue-50 border-blue-200' : ''
+                      }`}
+                      onClick={() => {
+                        setQuery(place.place_name);
+                        setSelectedLocation(place);
+                      }}
+                    >
+                      <div className="font-medium">{place.place_name}</div>
+                      <div className="text-sm text-gray-500">
+                        Lat: {place.center[1].toFixed(4)}, Lng: {place.center[0].toFixed(4)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {selectedLocation && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Selected Location:</p>
+                      <p className="text-sm text-green-700">{selectedLocation.place_name}</p>
+                      <p className="text-xs text-green-600">
+                        Lat: {selectedLocation.center[1].toFixed(4)}, Lng: {selectedLocation.center[0].toFixed(4)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedLocation(null)}
+                      className="text-green-600 hover:text-green-800 text-sm"
+                    >
+                      Change
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex space-x-3 pt-4">
@@ -390,8 +392,8 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-lg p-6 w-96 max-h-96 overflow-y-auto">
+    <div className="fixed inset-0 bg-white bg-opacity-5 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-white rounded-lg p-6 w-[700px] h-[600px] overflow-y-auto shadow-2xl border border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Add New Location</h3>
           <button
@@ -402,8 +404,8 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
           </button>
         </div>
 
-        <div className="space-y-4">
-          <div>
+        <div className="space-y-4 h-[480px] flex flex-col">
+          <div className="h-16">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Keyword (e.g., Home, Work, School)
             </label>
@@ -416,7 +418,7 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
             />
           </div>
 
-          <div>
+          <div className="flex-1 flex flex-col">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Address
             </label>
@@ -428,55 +430,57 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
               className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             />
 
-            {!GOOGLE_MAPS_API_KEY && !MAPBOX_TOKEN && (
-              <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  <strong>Note:</strong> Location search is disabled. Please enter addresses manually.
-                </p>
-              </div>
-            )}
-            
-            {results.length > 0 && !selectedLocation && (
-              <div className="mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                {results.map((place, index) => (
-                  <div
-                    key={index}
-                    className={`p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                      selectedLocation?.place_name === place.place_name ? 'bg-blue-50 border-blue-200' : ''
-                    }`}
-                    onClick={() => {
-                      setQuery(place.place_name);
-                      setSelectedLocation(place);
-                    }}
-                  >
-                    <div className="font-medium">{place.place_name}</div>
-                    <div className="text-sm text-gray-500">
-                      Lat: {place.center[1].toFixed(4)}, Lng: {place.center[0].toFixed(4)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {selectedLocation && (
-              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-green-800">Selected Location:</p>
-                    <p className="text-sm text-green-700">{selectedLocation.place_name}</p>
-                    <p className="text-xs text-green-600">
-                      Lat: {selectedLocation.center[1].toFixed(4)}, Lng: {selectedLocation.center[0].toFixed(4)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedLocation(null)}
-                    className="text-green-600 hover:text-green-800 text-sm"
-                  >
-                    Change
-                  </button>
+            <div className="flex-1 mt-2 overflow-y-auto">
+              {!GOOGLE_MAPS_API_KEY && !MAPBOX_TOKEN && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-2">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Note:</strong> Location search is disabled. Please enter addresses manually.
+                  </p>
                 </div>
-              </div>
-            )}
+              )}
+              
+              {results.length > 0 && !selectedLocation && (
+                <div className="bg-white border border-gray-300 rounded-lg shadow-lg">
+                  {results.map((place, index) => (
+                    <div
+                      key={index}
+                      className={`p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                        selectedLocation?.place_name === place.place_name ? 'bg-blue-50 border-blue-200' : ''
+                      }`}
+                      onClick={() => {
+                        setQuery(place.place_name);
+                        setSelectedLocation(place);
+                      }}
+                    >
+                      <div className="font-medium">{place.place_name}</div>
+                      <div className="text-sm text-gray-500">
+                        Lat: {place.center[1].toFixed(4)}, Lng: {place.center[0].toFixed(4)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {selectedLocation && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Selected Location:</p>
+                      <p className="text-sm text-green-700">{selectedLocation.place_name}</p>
+                      <p className="text-xs text-green-600">
+                        Lat: {selectedLocation.center[1].toFixed(4)}, Lng: {selectedLocation.center[0].toFixed(4)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedLocation(null)}
+                      className="text-green-600 hover:text-green-800 text-sm"
+                    >
+                      Change
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex space-x-3 pt-4">
