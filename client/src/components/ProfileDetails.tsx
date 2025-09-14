@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from "react";
+import { signOut } from 'next-auth/react';
 import { X, Plus, Edit } from 'lucide-react';
 
-const MAPBOX_TOKEN =process.env['NEXT_PUBLIC_MAPBOX_TOKEN']
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
 interface Location {
   id: string;
@@ -13,6 +14,10 @@ interface Location {
 
 interface ProfileDetailsProps {
   onClose: () => void;
+  user?: {
+    name?: string | null;
+    email?: string | null;
+  };
 }
 
 interface LocationSearchModalProps {
@@ -34,17 +39,37 @@ function LocationSearchModal({ location, onSave, onClose }: LocationSearchModalP
     }
 
     const fetchLocations = async () => {
+      // Check if Mapbox token is available
+      if (!MAPBOX_TOKEN) {
+        console.warn("Mapbox token not configured. Location search disabled.");
+        setResults([]);
+        return;
+      }
+
       try {
         const response = await fetch(
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
             query
           )}.json?access_token=${MAPBOX_TOKEN}&autocomplete=true&limit=4`
         );
+        
+        if (!response.ok) {
+          throw new Error(`Mapbox API error: ${response.status} ${response.statusText}`);
+        }
+        
         const data = await response.json();
-        const places = data.features.map((f: any) => f.place_name);
-        setResults(places);
+        
+        // Check if data has features array
+        if (data.features && Array.isArray(data.features)) {
+          const places = data.features.map((f: { place_name: string }) => f.place_name);
+          setResults(places);
+        } else {
+          console.warn("Unexpected Mapbox API response format:", data);
+          setResults([]);
+        }
       } catch (err) {
         console.error("Error fetching locations:", err);
+        setResults([]);
       }
     };
 
@@ -93,12 +118,20 @@ function LocationSearchModal({ location, onSave, onClose }: LocationSearchModalP
             </label>
             <input
               type="text"
-              placeholder="Search for a location"
+              placeholder={MAPBOX_TOKEN ? "Search for a location" : "Enter location manually (search disabled)"}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             />
 
+            {!MAPBOX_TOKEN && (
+              <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Note:</strong> Location search is disabled. Please enter addresses manually.
+                </p>
+              </div>
+            )}
+            
             {results.length > 0 && (
               <div className="mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                 {results.map((place, index) => (
@@ -134,7 +167,7 @@ function LocationSearchModal({ location, onSave, onClose }: LocationSearchModalP
   );
 }
 
-export default function ProfileDetails({ onClose }: ProfileDetailsProps) {
+export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
   const [locations, setLocations] = useState<Location[]>([
     {
       id: '1',
@@ -185,14 +218,29 @@ export default function ProfileDetails({ onClose }: ProfileDetailsProps) {
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b border-gray-200">
         <div>
-          <h1 className="text-3xl font-bold text-black">Jack Russell</h1>
-          <p className="text-lg text-gray-600 mt-1">My locations</p>
+          <h1 className="text-3xl font-bold text-black">
+            {user?.name || 'User'}
+          </h1>
+          <p className="text-lg text-gray-600 mt-1">
+            {user?.email || 'user@example.com'}
+          </p>
         </div>
         <div className="flex items-center space-x-3">
           <button
-            onClick={() => {
-              // TODO: Implement logout functionality
-              console.log('Logout clicked');
+            onClick={async () => {
+              try {
+                console.log('Signing out...');
+                await signOut({ 
+                  callbackUrl: '/landing',
+                  redirect: true 
+                });
+              } catch (error) {
+                console.error('Sign out error:', error);
+                // Fallback: clear storage and redirect
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.href = '/landing';
+              }
             }}
             className="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
           >
@@ -209,6 +257,9 @@ export default function ProfileDetails({ onClose }: ProfileDetailsProps) {
 
       {/* Content */}
       <div className="max-w-4xl mx-auto p-6">
+        {/* Section Header */}
+        <h2 className="text-xl font-semibold text-gray-800 mb-6">My locations</h2>
+        
         {/* Locations List */}
         <div className="space-y-0">
           {locations.map((location, index) => (
@@ -219,20 +270,24 @@ export default function ProfileDetails({ onClose }: ProfileDetailsProps) {
               )}
               
               {/* Location Row */}
-              <div className="flex items-center justify-between py-4">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-4">
+              <div className="flex items-start justify-between py-6">
+                <div className="flex-1 space-y-2">
+                  <div className="bg-gray-50 rounded-lg px-4 py-3">
                     <h3 className="text-lg font-bold text-black">{location.name}</h3>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg px-4 py-3">
                     <p className="text-base text-gray-700">{location.address}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleEditLocation(location.id)}
-                  className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors flex items-center space-x-2"
-                >
-                  <Edit size={16} />
-                  <span>Edit</span>
-                </button>
+                <div className="ml-4">
+                  <button
+                    onClick={() => handleEditLocation(location.id)}
+                    className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors flex items-center space-x-2"
+                  >
+                    <Edit size={16} />
+                    <span>Edit</span>
+                  </button>
+                </div>
               </div>
             </div>
           ))}

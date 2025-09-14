@@ -1,15 +1,51 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import Image from "next/image";
 import MapboxMap from "@/components/MapboxMap";
 import UserProfile from "@/components/UserProfile";
 import ChatInterface from "@/components/ChatInterface";
 import RoutePlanningPanel from "@/components/RoutePlanningPanel";
-import { RouteProvider } from "@/components/context/route-context"; // ✅ import your context provider
+import { RouteProvider } from "@/components/context/route-context";
 
 export default function Home() {
-  const [chatOpen, setChatOpen] = useState(true);
+  const chatOpen = true; // Chat is always open for now
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    console.log('=== AUTH DEBUG ===');
+    console.log('Session exists:', !!session);
+    console.log('Status:', status);
+    console.log('User:', session?.user);
+    console.log('URL search params:', window.location.search);
+    console.log('Has callbackUrl:', window.location.search.includes('callbackUrl'));
+    
+    // Redirect to landing page if not authenticated
+    if (status === 'unauthenticated' && !window.location.search.includes('callbackUrl')) {
+      console.log('🚀 REDIRECTING TO LANDING PAGE - not authenticated');
+      router.push('/landing');
+    } else if (session) {
+      console.log('✅ User authenticated:', session.user);
+    } else {
+      console.log('⏳ Still loading or other state...');
+    }
+  }, [session, status, router]);
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-gray-600 text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return null; // Will redirect to landing page
+  }
 
   return (
     <RouteProvider>

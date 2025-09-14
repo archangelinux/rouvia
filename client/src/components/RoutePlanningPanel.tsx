@@ -185,8 +185,8 @@ export default function RoutePlanningPanel() {
       // Set summary
       setEtaMin(Math.round((route.duration ?? 0) / 60));
       setDistanceKm((route.distance ?? 0) / 1000);
-    } catch (e: any) {
-      setError(e?.message || "Failed to fetch directions.");
+    } catch (e: unknown) {
+      setError((e as Error)?.message || "Failed to fetch directions.");
     } finally {
       setLoading(false);
     }
