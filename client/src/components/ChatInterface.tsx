@@ -78,12 +78,9 @@ export default function ChatInterface() {
     "Optimizing route...",
     "Maximizing ratings...",
     "Calling Sam Altman...",
-    "Consulting the AI overlords...",
     "Finding the perfect spots...",
     "Calculating optimal path...",
-    "Sprinkling some magic...",
-    "Reading the travel tea leaves...",
-    "Coordinating with local pigeons...",
+    "Asking Mr.Goose for directions...",
     "Crunching travel data...",
     "Polishing your adventure..."
   ];
@@ -170,7 +167,7 @@ export default function ChatInterface() {
       // Replace loading message with error
       removeLoadingMessage(loadingId);
       appendMessage({
-        text: "⚠️ Failed to send message to server.",
+        text: "Failed to send message to server.",
         role: "system",
       });
       console.error(err);
@@ -209,14 +206,14 @@ export default function ChatInterface() {
           if (blob.size === 0) {
             console.error("❌ Empty audio blob! Recording may have been too short.");
             appendMessage({
-              text: "⚠️ Recording was too short or empty. Please hold the microphone button longer.",
+              text: "Recording was too short or empty. Please hold the microphone button longer.",
               role: "system",
             });
             return;
           }
 
           const placeholderId = appendMessage({
-            text: "🎙️ Transcribing your voice...",
+            text: "Transcribing your voice...",
             role: "user",
           });
 
@@ -257,7 +254,7 @@ export default function ChatInterface() {
             const transcript: string = result.transcribed_text || "";
             replaceMessageText(
               placeholderId,
-              transcript || "🎙️ (No transcript returned)"
+              transcript || "(No transcript returned)"
             );
 
             // Remove loading message
@@ -270,12 +267,12 @@ export default function ChatInterface() {
           } catch (err) {
             replaceMessageText(
               placeholderId,
-              "⚠️ Transcription failed. Please try again."
+              "Transcription failed. Please try again."
             );
             // Remove loading message and show error
             removeLoadingMessage(loadingId);
             appendMessage({
-              text: "⚠️ Processing failed. Please try again.",
+              text: "Processing failed. Please try again.",
               role: "system",
             });
             console.error("Failed to send audio:", err);
@@ -295,7 +292,7 @@ export default function ChatInterface() {
       } catch (err) {
         console.error("❌ Failed to start recording:", err);
         appendMessage({
-          text: "⚠️ Could not access microphone. Please check permissions.",
+          text: "Could not access microphone. Please check permissions.",
           role: "system",
         });
       }
@@ -371,10 +368,9 @@ export default function ChatInterface() {
               const isLoadingMessage = msg.role === "assistant" && 
                 (msg.text.includes("Analyzing") || msg.text.includes("Optimizing") || 
                  msg.text.includes("Maximizing") || msg.text.includes("Calling") ||
-                 msg.text.includes("Consulting") || msg.text.includes("Finding") ||
-                 msg.text.includes("Calculating") || msg.text.includes("Sprinkling") ||
-                 msg.text.includes("Reading") || msg.text.includes("Coordinating") ||
-                 msg.text.includes("Crunching") || msg.text.includes("Polishing"));
+                 msg.text.includes("Finding") || msg.text.includes("Calculating") || 
+                 msg.text.includes("Asking") || msg.text.includes("Crunching") || 
+                 msg.text.includes("Polishing"));
 
               return (
                 <div
