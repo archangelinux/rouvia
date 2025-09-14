@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from "react";
-import { signOut } from 'next-auth/react';
 import { X, Plus, Edit, Trash2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -457,6 +457,7 @@ function AddLocationModal({ onSave, onClose }: AddLocationModalProps) {
 }
 
 export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
+  const { user: auth0User, logout } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingLocation, setEditingLocation] = useState<{keyword: string, location: Location} | null>(null);
@@ -466,13 +467,20 @@ export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
   // Load user profile from MongoDB
   useEffect(() => {
     const loadUserProfile = async () => {
+      if (!auth0User?.sub) {
+        setError('Please log in to view your profile');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const response = await fetch('/api/user-profile');
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${apiUrl}/api/user-profile/${auth0User.sub}`);
         
         if (!response.ok) {
-          if (response.status === 401) {
-            setError('Please log in to view your profile');
+          if (response.status === 404) {
+            setError('Profile not found. Please try logging in again.');
             return;
           }
           throw new Error('Failed to load profile');
@@ -489,15 +497,21 @@ export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
     };
 
     loadUserProfile();
-  }, []);
+  }, [auth0User?.sub]);
 
   const handleEditLocation = (keyword: string, location: Location) => {
     setEditingLocation({ keyword, location });
   };
 
   const handleSaveLocation = async (keyword: string, updatedLocation: Location) => {
+    if (!auth0User?.sub) {
+      alert('Please log in to save locations');
+      return;
+    }
+
     try {
-      const response = await fetch('/api/user-profile', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/user-profile/${auth0User.sub}/keywords`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -537,12 +551,18 @@ export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
   };
 
   const handleDeleteLocation = async (keyword: string) => {
+    if (!auth0User?.sub) {
+      alert('Please log in to delete locations');
+      return;
+    }
+
     if (!confirm(`Are you sure you want to delete the "${keyword}" location?`)) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/user-profile?keyword=${encodeURIComponent(keyword)}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/user-profile/${auth0User.sub}/keywords/${encodeURIComponent(keyword)}`, {
         method: 'DELETE',
       });
 
@@ -613,10 +633,7 @@ export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
             onClick={async () => {
               try {
                 console.log('Signing out...');
-                await signOut({ 
-                  callbackUrl: '/landing',
-                  redirect: true 
-                });
+                await logout();
               } catch (error) {
                 console.error('Sign out error:', error);
                 // Fallback: clear storage and redirect

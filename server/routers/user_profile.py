@@ -9,7 +9,8 @@ from services.user_profile_service import (
     add_keyword_location,
     get_user_keywords,
     get_user_profile_by_auth0_id,
-    delete_keyword
+    delete_keyword,
+    migrate_existing_users_add_keywords
 )
 
 router = APIRouter(prefix="/api/user-profile", tags=["user-profile"])
@@ -179,3 +180,19 @@ async def get_keyword(auth0_user_id: str, keyword: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get keyword: {str(e)}")
+
+@router.post("/migrate-keywords")
+async def migrate_keywords():
+    """
+    Migration endpoint to add keywords field to existing users
+    """
+    try:
+        migrated_count = migrate_existing_users_add_keywords()
+        
+        return {
+            "success": True,
+            "message": f"Migration completed successfully",
+            "migrated_users": migrated_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
