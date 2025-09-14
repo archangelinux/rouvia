@@ -14,6 +14,10 @@ export type PlaceStop = {
   google_maps_uri?: string;
   website_uri?: string | null;
   business_status?: string;
+
+  // NEW (optional)
+  start_time?: string; // e.g. "10:00"
+  duration_hours?: number; // e.g. 1.5
 };
 
 type Waypoint = [number, number]; // [lng, lat] for Mapbox

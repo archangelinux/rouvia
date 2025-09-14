@@ -1,7 +1,9 @@
-'use client';
+// src/components/RoutePlanningPanel.tsx (your FilterPanel component)
+"use client";
 
-import { useState } from 'react';
-import { MessageCircle, Sparkles, Wand2 } from 'lucide-react';
+import { useState } from "react";
+import { MessageCircle, Sparkles, Wand2 } from "lucide-react";
+import { useRoute, type PlaceStop } from "@/components/context/route-context";
 
 interface FilterState {
   energy: number;
@@ -23,22 +25,47 @@ interface FilterState {
   distance: string;
 }
 
-async function getUserLocation(): Promise<{ latitude: number; longitude: number }> {
+async function getUserLocation(): Promise<{
+  latitude: number;
+  longitude: number;
+}> {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        resolve({ latitude, longitude });
-      },
-      (error) => {
-        reject(error);
-      },
+      ({ coords }) =>
+        resolve({ latitude: coords.latitude, longitude: coords.longitude }),
+      (error) => reject(error),
       { enableHighAccuracy: true }
     );
   });
 }
 
+// ---- helper: map API object -> PlaceStop
+type ApiStop = {
+  title: string;
+  lat: number;
+  lon: number;
+  start_time?: string;
+  duration_hours?: number;
+  address?: string;
+  place_id?: string;
+  // ...anything else your backend includes
+};
+
+function mapApiStopToPlaceStop(s: ApiStop, idx: number): PlaceStop {
+  return {
+    place_id: s.place_id ?? `api-${idx}-${s.title}-${s.lat},${s.lon}`,
+    name: s.title,
+    address: s.address ?? "",
+    lat: s.lat,
+    lng: s.lon,
+    start_time: s.start_time,
+    duration_hours: s.duration_hours,
+  };
+}
+
 export default function FilterPanel() {
+  const { setUserLocation, setStops, setWaypoints } = useRoute();
+
   const [filters, setFilters] = useState<FilterState>({
     energy: 5,
     interests: {
@@ -48,207 +75,141 @@ export default function FilterPanel() {
       scenery: false,
     },
     budget: 0,
-    time: {
-      start: '09:00',
-      end: '17:00',
-    },
-    indoorOutdoor: {
-      indoor: false,
-      outdoor: false,
-    },
-    distance: '',
+    time: { start: "09:00", end: "17:00" },
+    indoorOutdoor: { indoor: false, outdoor: false },
+    distance: "",
   });
 
-  const handleEnergyChange = (value: number) => {
-    setFilters(prev => ({ ...prev, energy: value }));
-  };
-
-  const handleBudgetChange = (value: number) => {
-    setFilters(prev => ({ ...prev, budget: value }));
-  };
-
-  const handleInterestChange = (interest: keyof FilterState['interests']) => {
-    setFilters(prev => ({
-      ...prev,
-      interests: {
-        ...prev.interests,
-        [interest]: !prev.interests[interest],
-      },
+  const handleEnergyChange = (value: number) =>
+    setFilters((p) => ({ ...p, energy: value }));
+  const handleBudgetChange = (value: number) =>
+    setFilters((p) => ({ ...p, budget: value }));
+  const handleInterestChange = (interest: keyof FilterState["interests"]) =>
+    setFilters((p) => ({
+      ...p,
+      interests: { ...p.interests, [interest]: !p.interests[interest] },
     }));
-  };
-
-  const handleTimeChange = (field: 'start' | 'end', value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      time: {
-        ...prev.time,
-        [field]: value,
-      },
+  const handleTimeChange = (field: "start" | "end", value: string) =>
+    setFilters((p) => ({ ...p, time: { ...p.time, [field]: value } }));
+  const handleIndoorOutdoorChange = (
+    type: keyof FilterState["indoorOutdoor"]
+  ) =>
+    setFilters((p) => ({
+      ...p,
+      indoorOutdoor: { ...p.indoorOutdoor, [type]: !p.indoorOutdoor[type] },
     }));
-  };
-
-  const handleIndoorOutdoorChange = (type: keyof FilterState['indoorOutdoor']) => {
-    setFilters(prev => ({
-      ...prev,
-      indoorOutdoor: {
-        ...prev.indoorOutdoor,
-        [type]: !prev.indoorOutdoor[type],
-      },
-    }));
-  };
-
-  const handleDistanceChange = (value: string) => {
-    setFilters(prev => ({ ...prev, distance: value }));
-  };
+  const handleDistanceChange = (value: string) =>
+    setFilters((p) => ({ ...p, distance: value }));
 
   const handleGenerateSidequest = async () => {
-    // Validate distance field
-    if (filters.distance.trim() === '') {
-      alert('Please enter a distance value');
+    // Validate distance
+    if (filters.distance.trim() === "") {
+      alert("Please enter a distance value");
       return;
     }
-
     const distanceNumber = parseFloat(filters.distance);
     if (isNaN(distanceNumber) || distanceNumber < 0) {
-      alert('Distance must be a valid positive number');
+      alert("Distance must be a valid positive number");
       return;
     }
 
     // Get user location
-    let location;
+    let location: { latitude: number; longitude: number } | null = null;
     try {
       location = await getUserLocation();
-      console.log("User location:", location.latitude, location.longitude);
+      setUserLocation(location); // ✅ push into context
     } catch (err) {
       console.error("Failed to get location:", err);
-      location = null;
+      alert("Please enable location access and try again.");
+      return;
     }
 
-    if(!location) {
-      console.log("Location not found, line 157 FilterPanel.tsx")
-      return (
-        <div>
-          <p>Please enable location access and try again.</p>
-        </div>
-      )
-    }
+    // Selected interests and indoor/outdoor
+    const selectedInterests = Object.keys(filters.interests).filter(
+      (k) => filters.interests[k as keyof typeof filters.interests]
+    );
+    const selectedIndoorOutdoor =
+      filters.indoorOutdoor.indoor && filters.indoorOutdoor.outdoor
+        ? null
+        : filters.indoorOutdoor.indoor
+        ? "indoor"
+        : filters.indoorOutdoor.outdoor
+        ? "outdoor"
+        : null;
 
-    // Fix: Get selected interests as array of strings
-    const selectedInterests = Object.keys(filters.interests)
-      .filter(key => filters.interests[key as keyof typeof filters.interests]);
-
-    // Fix: Get selected indoor/outdoor preference as string or null
-    const selectedIndoorOutdoor = 
-      filters.indoorOutdoor.indoor && filters.indoorOutdoor.outdoor ? null :
-      filters.indoorOutdoor.indoor ? "indoor" :
-      filters.indoorOutdoor.outdoor ? "outdoor" : null;
-
-    const sidequestData = {
-      "lat": location.latitude,
-      "lon": location.longitude,
-      "travel_distance": distanceNumber,
-      "start_time": filters.time.start,
-      "end_time": filters.time.end,
-      "budget": filters.budget > 0 ? filters.budget : null,
-      "interests": selectedInterests,
-      "energy": filters.energy,
-      "indoor_outdoor": selectedIndoorOutdoor,
-      "user_id": "test_user",
+    const payload = {
+      lat: location.latitude,
+      lon: location.longitude,
+      travel_distance: distanceNumber,
+      start_time: filters.time.start,
+      end_time: filters.time.end,
+      budget: filters.budget > 0 ? filters.budget : null,
+      interests: selectedInterests,
+      energy: filters.energy,
+      indoor_outdoor: selectedIndoorOutdoor,
+      user_id: "test_user",
     };
 
-    console.log('Sending sidequest data:', sidequestData);
-
     try {
-      const response = await fetch('http://localhost:8000/sidequest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sidequestData),
+      const res = await fetch("http://localhost:8000/sidequest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Sidequest generated:', result);
-        
-        // Return well-structured JSON object with all input parameters
-        const structuredResponse = {
-          inputParameters: {
-            lat: location.latitude,
-            lon: location.longitude,
-            energy: filters.energy,
-            interests: Object.keys(filters.interests).filter(key => filters.interests[key as keyof typeof filters.interests]),
-            budget: filters.budget,
-            time: {
-              start: filters.time.start,
-              end: filters.time.end,
-            },
-            indoorOutdoor: Object.keys(filters.indoorOutdoor).filter(key => filters.indoorOutdoor[key as keyof typeof filters.indoorOutdoor]),
-            distance: distanceNumber,
-          },
-          generatedSidequest: result,
-          timestamp: new Date().toISOString(),
-          status: 'success'
-        };
-        
-        console.log('Structured response:', structuredResponse);
-        return structuredResponse;
-      } else {
-        console.error('Failed to generate sidequest');
-        const errorResponse = {
-          inputParameters: {
-            latitude: location.latitude,
-            longitude: location.longitude,
-            energy: filters.energy,
-            interests: Object.keys(filters.interests).filter(key => filters.interests[key as keyof typeof filters.interests]),
-            budget: filters.budget,
-            time: {
-              start: filters.time.start,
-              end: filters.time.end,
-            },
-            indoorOutdoor: Object.keys(filters.indoorOutdoor).filter(key => filters.indoorOutdoor[key as keyof typeof filters.indoorOutdoor]),
-            distance: distanceNumber,
-          },
-          error: 'Failed to generate sidequest',
-          timestamp: new Date().toISOString(),
-          status: 'error'
-        };
-        console.log('Error response:', errorResponse);
-        return errorResponse;
+      if (!res.ok) {
+        console.error(
+          "Failed to generate sidequest:",
+          res.status,
+          await res.text()
+        );
+        alert("Failed to generate sidequest.");
+        return;
       }
+
+      const json = await res.json();
+      // The backend might return a single object or an array—support both:
+      // - { title, lat, lon, ... }
+      // - [ { title, lat, lon, ... }, ... ]
+      const stopsArray: ApiStop[] = Array.isArray(json)
+        ? json
+        : Array.isArray(json?.stops)
+        ? json.stops
+        : [json];
+
+      // Map to PlaceStop[]
+      const placeStops: PlaceStop[] = stopsArray.map(mapApiStopToPlaceStop);
+
+      // ✅ Update context: stops
+      setStops(placeStops);
+
+      // ✅ Update context: waypoints → [lng, lat], include origin first if you want routing from user to first stop
+      const wp: [number, number][] = [
+        [location.longitude, location.latitude],
+        ...placeStops.map((s) => [s.lng, s.lat]),
+      ];
+      setWaypoints(wp);
+
+      console.log("Route context updated:", {
+        userLocation: location,
+        stops: placeStops,
+        waypoints: wp,
+      });
+      alert("Sidequest generated! Route updated.");
     } catch (error) {
-      console.error('Error generating sidequest:', error);
-      const errorResponse = {
-        inputParameters: {
-          location: {
-            latitude: location.latitude,
-            longitude: location.longitude,
-          },
-          energy: filters.energy,
-          interests: Object.keys(filters.interests).filter(key => filters.interests[key as keyof typeof filters.interests]),
-          budget: filters.budget,
-          time: {
-            start: filters.time.start,
-            end: filters.time.end,
-          },
-          indoorOutdoor: Object.keys(filters.indoorOutdoor).filter(key => filters.indoorOutdoor[key as keyof typeof filters.indoorOutdoor]),
-          distance: distanceNumber,
-        },
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        timestamp: new Date().toISOString(),
-        status: 'error'
-      };
-      console.log('Error response:', errorResponse);
-      return errorResponse;
+      console.error("Error generating sidequest:", error);
+      alert("Unexpected error while generating sidequest.");
     }
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
       <div className="space-y-6">
-        {/* Energy Section */}
+        {/* Energy */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Energy (0-10)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Energy (0-10)
+          </label>
           <div className="relative">
             <input
               type="range"
@@ -258,38 +219,53 @@ export default function FilterPanel() {
               onChange={(e) => handleEnergyChange(Number(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
               style={{
-                background: `linear-gradient(to right, #10b981 0%, #10b981 ${((filters.energy) / 10) * 100}%, #e5e7eb ${((filters.energy) / 10) * 100}%, #e5e7eb 100%)`
+                background: `linear-gradient(to right, #10b981 0%, #10b981 ${
+                  (filters.energy / 10) * 100
+                }%, #e5e7eb ${(filters.energy / 10) * 100}%, #e5e7eb 100%)`,
               }}
             />
             <div className="flex justify-between text-xs text-gray-500 mt-2">
               <span>0</span>
-              <span className="text-green-600 font-medium">{filters.energy}</span>
+              <span className="text-green-600 font-medium">
+                {filters.energy}
+              </span>
               <span>10</span>
             </div>
           </div>
         </div>
 
-        {/* Interests Section */}
+        {/* Interests */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Interests</label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Interests
+          </label>
           <div className="grid grid-cols-2 gap-2">
-            {(['shopping', 'food', 'entertainment', 'scenery'] as const).map((interest) => (
-              <label key={interest} className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.interests[interest]}
-                  onChange={() => handleInterestChange(interest)}
-                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                />
-                <span className="text-sm text-gray-700 capitalize">{interest}</span>
-              </label>
-            ))}
+            {(["shopping", "food", "entertainment", "scenery"] as const).map(
+              (interest) => (
+                <label
+                  key={interest}
+                  className="flex items-center space-x-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={filters.interests[interest]}
+                    onChange={() => handleInterestChange(interest)}
+                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <span className="text-sm text-gray-700 capitalize">
+                    {interest}
+                  </span>
+                </label>
+              )
+            )}
           </div>
         </div>
 
-        {/* Budget Section */}
+        {/* Budget */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Budget</label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Budget
+          </label>
           <div className="relative">
             <input
               type="range"
@@ -299,27 +275,33 @@ export default function FilterPanel() {
               onChange={(e) => handleBudgetChange(Number(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
               style={{
-                background: `linear-gradient(to right, #10b981 0%, #10b981 ${(filters.budget / 400) * 100}%, #e5e7eb ${(filters.budget / 400) * 100}%, #e5e7eb 100%)`
+                background: `linear-gradient(to right, #10b981 0%, #10b981 ${
+                  (filters.budget / 400) * 100
+                }%, #e5e7eb ${(filters.budget / 400) * 100}%, #e5e7eb 100%)`,
               }}
             />
             <div className="flex justify-between text-xs text-gray-500 mt-2">
               <span>$0</span>
-              <span className="text-green-600 font-medium">${filters.budget}</span>
+              <span className="text-green-600 font-medium">
+                ${filters.budget}
+              </span>
               <span>$400</span>
             </div>
           </div>
         </div>
 
-        {/* Time Section */}
+        {/* Time */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Time (24hr)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Time (24hr)
+          </label>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Start</label>
               <input
                 type="time"
                 value={filters.time.start}
-                onChange={(e) => handleTimeChange('start', e.target.value)}
+                onChange={(e) => handleTimeChange("start", e.target.value)}
                 className="w-full px-3 py-2 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-green-50 text-green-700"
               />
             </div>
@@ -328,19 +310,24 @@ export default function FilterPanel() {
               <input
                 type="time"
                 value={filters.time.end}
-                onChange={(e) => handleTimeChange('end', e.target.value)}
+                onChange={(e) => handleTimeChange("end", e.target.value)}
                 className="w-full px-3 py-2 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-green-50 text-green-700"
               />
             </div>
           </div>
         </div>
 
-        {/* Indoor/Outdoor Section */}
+        {/* Indoor/Outdoor */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-5">Indoor/Outdoor</label>
+          <label className="block text-sm font-medium text-gray-700 mb-5">
+            Indoor/Outdoor
+          </label>
           <div className="flex gap-3">
-            {(['indoor', 'outdoor'] as const).map((type) => (
-              <label key={type} className="flex items-center space-x-1 cursor-pointer">
+            {(["indoor", "outdoor"] as const).map((type) => (
+              <label
+                key={type}
+                className="flex items-center space-x-1 cursor-pointer"
+              >
                 <input
                   type="checkbox"
                   checked={filters.indoorOutdoor[type]}
@@ -353,9 +340,11 @@ export default function FilterPanel() {
           </div>
         </div>
 
-        {/* Distance Section */}
+        {/* Distance */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Distance</label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Distance
+          </label>
           <div className="flex items-center space-x-2">
             <input
               type="text"
@@ -373,7 +362,7 @@ export default function FilterPanel() {
           </div>
         </div>
 
-        {/* Generate Sidequest Button */}
+        {/* Generate */}
         <div className="pt-4">
           <button
             onClick={handleGenerateSidequest}
