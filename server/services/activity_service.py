@@ -231,6 +231,11 @@ def _structure_new_google_place(place, city):
         types = place.get("types", [])
         price_level = place.get("priceLevel", "PRICE_LEVEL_UNSPECIFIED")
         
+        # Get coordinates from location
+        location = place.get("location", {})
+        lat = location.get("latitude", 0.0)
+        lon = location.get("longitude", 0.0)
+        
         # Convert price level from new API format
         price_mapping = {
             "PRICE_LEVEL_FREE": 0,
@@ -261,7 +266,9 @@ def _structure_new_google_place(place, city):
         
         structured = {
             "title": name,
-            "location": formatted_address,
+            "lat": lat,
+            "lon": lon,
+            "location": formatted_address,  # Keep for backward compatibility
             "start_time": None,  # Would need additional API call for hours
             "duration_hours": _estimate_duration(activity_type),
             "cost": cost,
@@ -271,7 +278,7 @@ def _structure_new_google_place(place, city):
             "confidence": confidence
         }
         
-        print(f"[Google Places] Structured (NEW API): {name} -> {activity_type} ({indoor_outdoor}, pricing by Cohere, energy:{energy_level})")
+        print(f"[Google Places] Structured (NEW API): {name} -> {activity_type} ({indoor_outdoor}, lat:{lat}, lon:{lon})")
         
         return {
             "raw_name": name,
@@ -295,6 +302,12 @@ def _structure_google_place(place, city):
         types = place.get("types", [])
         price_level = place.get("price_level", 0)
         
+        # Get coordinates from geometry
+        geometry = place.get("geometry", {})
+        location = geometry.get("location", {})
+        lat = location.get("lat", 0.0)
+        lon = location.get("lng", 0.0)
+        
         # Determine activity type based on Google types
         activity_type = _map_google_types_to_activity_type(types)
         
@@ -312,7 +325,9 @@ def _structure_google_place(place, city):
         
         structured = {
             "title": name,
-            "location": place.get("formatted_address", city),
+            "lat": lat,
+            "lon": lon,
+            "location": place.get("formatted_address", city),  # Keep for backward compatibility
             "start_time": None,  # Would need additional API call for hours
             "duration_hours": _estimate_duration(activity_type),
             "cost": cost,
@@ -322,7 +337,7 @@ def _structure_google_place(place, city):
             "confidence": confidence
         }
         
-        print(f"[Google Places] Structured: {name} -> {activity_type} ({indoor_outdoor}, ${cost}, energy:{energy_level})")
+        print(f"[Google Places] Structured: {name} -> {activity_type} ({indoor_outdoor}, lat:{lat}, lon:{lon})")
         
         return {
             "raw_name": name,
@@ -469,6 +484,8 @@ def _get_fallback_activities(lat, lon):
             "place_id": "fallback_1",
             "structured": {
                 "title": "Local Restaurant",
+                "lat": lat + 0.001,  # Slightly offset from user location
+                "lon": lon + 0.001,
                 "location": "Nearby Restaurant",
                 "start_time": None,
                 "duration_hours": 1.5,
@@ -484,6 +501,8 @@ def _get_fallback_activities(lat, lon):
             "place_id": "fallback_2",
             "structured": {
                 "title": "City Park",
+                "lat": lat + 0.002,
+                "lon": lon - 0.001,
                 "location": "Local Park",
                 "start_time": None,
                 "duration_hours": 2.0,
@@ -499,6 +518,8 @@ def _get_fallback_activities(lat, lon):
             "place_id": "fallback_3",
             "structured": {
                 "title": "Shopping Center",
+                "lat": lat - 0.001,
+                "lon": lon + 0.002,
                 "location": "Local Shopping Area",
                 "start_time": None,
                 "duration_hours": 2.0,
@@ -519,6 +540,8 @@ def _get_fallback_activities(lat, lon):
                 "place_id": "fallback_4",
                 "structured": {
                     "title": "Local Museum",
+                    "lat": lat - 0.002,
+                    "lon": lon - 0.002,
                     "location": "City Museum",
                     "start_time": None,
                     "duration_hours": 2.5,
@@ -534,6 +557,8 @@ def _get_fallback_activities(lat, lon):
                 "place_id": "fallback_5",
                 "structured": {
                     "title": "Entertainment Venue",
+                    "lat": lat + 0.003,
+                    "lon": lon + 0.003,
                     "location": "Local Entertainment",
                     "start_time": None,
                     "duration_hours": 2.0,
@@ -715,8 +740,7 @@ def fetch_nearby_places_bulk(lat: float, lon: float, limit: int = 100):
                     "radius": 5000.0  # 5km radius in meters
                 }
             },
-            "maxResultCount": limit,
-            "includedTypes": ["restaurant", "cafe", "park", "museum", "amusement_park", "shopping_mall", "gym", "tourist_attraction"]
+            "maxResultCount": min(limit, 20)  # searchNearby has a max limit of 20
         }
         
         response = requests.post(url, headers=headers, json=data, timeout=10)
@@ -732,7 +756,7 @@ def fetch_nearby_places_bulk(lat: float, lon: float, limit: int = 100):
         
         activities = []
         places = api_data.get("places", [])
-        for place in places[:limit]:
+        for place in places:
             structured_activity = _structure_google_place_bulk(place)
             if structured_activity:
                 # Wrap in the format expected by scoring service
@@ -753,9 +777,6 @@ def fetch_nearby_places_bulk(lat: float, lon: float, limit: int = 100):
 def fetch_google_places_by_interest(lat: float, lon: float, interest: str, limit: int = 15):
     """Fetch Google Places activities for a specific interest category"""
     try:
-        # Use flexible Google Places types based on interest
-        search_type = _get_google_places_type_for_interest(interest)
-        
         # Use the new Places API (New) format
         url = "https://places.googleapis.com/v1/places:searchNearby"
         headers = {
@@ -773,8 +794,7 @@ def fetch_google_places_by_interest(lat: float, lon: float, interest: str, limit
                     "radius": 5000.0  # 5km radius in meters
                 }
             },
-            "includedTypes": [search_type],
-            "maxResultCount": limit
+            "maxResultCount": min(limit, 20)  # searchNearby has a max limit of 20
         }
         
         response = requests.post(url, headers=headers, json=data, timeout=10)
@@ -786,8 +806,12 @@ def fetch_google_places_by_interest(lat: float, lon: float, interest: str, limit
         
         activities = []
         places = api_data.get("places", [])
-        for place in places[:limit]:
-            structured_activity = _structure_google_place_new_api(place, interest, search_type)
+        
+        # Filter places by interest after getting results
+        filtered_places = _filter_places_by_interest(places, interest)
+        
+        for place in filtered_places[:limit]:
+            structured_activity = _structure_google_place_new_api(place, interest, interest)
             if structured_activity:
                 # Wrap in the format expected by scoring service
                 activity = {
@@ -803,6 +827,39 @@ def fetch_google_places_by_interest(lat: float, lon: float, interest: str, limit
     except Exception as e:
         print(f"[Google Places] Error fetching {interest}: {e}")
         return []
+
+def _filter_places_by_interest(places: list, interest: str) -> list:
+    """Filter places based on interest category using Google types"""
+    
+    # Define type filters for each interest
+    interest_type_filters = {
+        "meals": ["restaurant", "meal_takeaway", "meal_delivery", "food"],
+        "bites": ["cafe", "bakery", "food"],
+        "entertainment": ["movie_theater", "night_club", "bar", "amusement_park"],
+        "events": ["amusement_park", "tourist_attraction", "event_venue"],
+        "scenery": ["park", "natural_feature", "tourist_attraction", "landmark"],
+        "culture": ["museum", "art_gallery", "library", "cultural_center"],
+        "shopping": ["shopping_mall", "store", "clothing_store", "electronics_store"],
+        "physical_activity": ["gym", "sports_complex", "fitness_center", "stadium"]
+    }
+    
+    target_types = interest_type_filters.get(interest, [])
+    if not target_types:
+        return places  # Return all if no filter defined
+    
+    filtered = []
+    for place in places:
+        place_types = place.get("types", [])
+        # Check if any of the place types match our interest
+        if any(ptype in target_types for ptype in place_types):
+            filtered.append(place)
+    
+    # If no matches found, return some places anyway (fallback)
+    if not filtered and places:
+        filtered = places[:5]  # Return first 5 as fallback
+    
+    print(f"[Google Places] Filtered {len(filtered)} places for interest '{interest}' from {len(places)} total")
+    return filtered
 
 def _structure_google_place_bulk(place: dict) -> dict:
     """Structure Google Places data from bulk API and categorize by interest"""
