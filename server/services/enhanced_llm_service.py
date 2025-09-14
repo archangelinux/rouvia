@@ -60,6 +60,8 @@ def parse_intent_with_rag(
     # Step 2: Check user keywords for ALL ambiguous words first
     rag_matches = []
     unmatched_words = []
+    wants_alternatives = False
+    order_preserved = True
     
     if auth0_user_id and ambiguous_words:
         rag_parser = CohereRAGLocationParser()
@@ -71,6 +73,8 @@ def parse_intent_with_rag(
         
         matched_keywords = rag_result.get('matched_keywords', [])
         location_data = rag_result.get('location_data', [])
+        wants_alternatives = rag_result.get('wants_alternatives', False)
+        order_preserved = rag_result.get('order_preserved', True)
         
         # Filter matches by distance (20km radius) and confidence
         if user_location and location_data:
@@ -101,10 +105,16 @@ def parse_intent_with_rag(
             
             rag_matches = filtered_matches
         
-        # Identify unmatched ambiguous words (these will use Google Places)
-        matched_keyword_names = [match['keyword'] for match in rag_matches]
-        unmatched_words = [word for word in ambiguous_words if word not in matched_keyword_names]
-        print(f"[Enhanced LLM] Unmatched words (will use Google Places): {unmatched_words}")
+        # KEYWORD PRIORITY RULE: If personal keywords are matched and user doesn't want alternatives,
+        # don't search for additional locations unless explicitly needed
+        if rag_matches and not wants_alternatives:
+            print(f"[Enhanced LLM] Personal keywords found, skipping Google Places search for: {[match['keyword'] for match in rag_matches]}")
+            unmatched_words = []  # Don't search for alternatives
+        else:
+            # Identify unmatched ambiguous words (these will use Google Places)
+            matched_keyword_names = [match['keyword'] for match in rag_matches]
+            unmatched_words = [word for word in ambiguous_words if word not in matched_keyword_names]
+            print(f"[Enhanced LLM] Unmatched words (will use Google Places): {unmatched_words}")
     
     # Step 3: Use standard Gemini parsing for ALL words (including unmatched ones)
     standard_intent = _parse_intent_standard(starting_location, text)
@@ -114,7 +124,9 @@ def parse_intent_with_rag(
         standard_intent, 
         rag_matches, 
         unmatched_words,
-        text
+        text,
+        order_preserved,
+        wants_alternatives
     )
     
     return enhanced_intent
@@ -196,7 +208,9 @@ def _enhance_intent_with_rag(
     standard_intent: Dict[str, Any],
     rag_matches: List[Dict[str, Any]],
     unmatched_words: List[str],
-    original_text: str
+    original_text: str,
+    order_preserved: bool = True,
+    wants_alternatives: bool = False
 ) -> Dict[str, Any]:
     """
     Enhance the standard intent with RAG keyword matches and handle unmatched words
@@ -207,8 +221,10 @@ def _enhance_intent_with_rag(
     enhanced_intent["rag_matches"] = rag_matches
     enhanced_intent["unmatched_ambiguous_words"] = unmatched_words
     enhanced_intent["has_personal_locations"] = len(rag_matches) > 0
+    enhanced_intent["order_preserved"] = order_preserved
+    enhanced_intent["wants_alternatives"] = wants_alternatives
     
-    # Modify place_types to include personal locations
+    # Modify place_types to include personal locations IN ORDER
     if rag_matches:
         personal_locations = []
         for match in rag_matches:
@@ -225,11 +241,16 @@ def _enhance_intent_with_rag(
                 "source": "user_keyword"
             })
         
-        # Add personal locations to place_types
-        if "place_types" not in enhanced_intent:
-            enhanced_intent["place_types"] = []
+        # ORDER PRESERVATION: Replace place_types with ordered personal locations
+        if order_preserved:
+            enhanced_intent["place_types"] = personal_locations
+            print(f"[Enhanced LLM] Order preserved: {[loc['keyword'] for loc in personal_locations]}")
+        else:
+            # If order not preserved, append to existing place_types
+            if "place_types" not in enhanced_intent:
+                enhanced_intent["place_types"] = []
+            enhanced_intent["place_types"].extend(personal_locations)
         
-        enhanced_intent["place_types"].extend(personal_locations)
         enhanced_intent["personal_locations"] = personal_locations
     
     # Handle unmatched ambiguous words
@@ -275,15 +296,17 @@ def _generate_unmatched_suggestions(unmatched_words: List[str], original_text: s
 def select_stops(intent: dict, candidates: list) -> list:
     """
     Enhanced stop selection that prioritizes personal locations from RAG matches
+    and preserves order when specified
     """
     # Check if we have personal locations
     personal_locations = intent.get("personal_locations", [])
+    order_preserved = intent.get("order_preserved", True)
     
     if personal_locations:
-        # Prioritize personal locations
+        # ORDER PRESERVATION: Use personal locations in the order they were mentioned
         selected_stops = []
         
-        # Add personal locations first
+        # Add personal locations in order
         for personal_loc in personal_locations:
             selected_stops.append({
                 "name": personal_loc["name"],
@@ -300,7 +323,12 @@ def select_stops(intent: dict, candidates: list) -> list:
                 "confidence": personal_loc["confidence"]
             })
         
-        # Add remaining stops from standard selection
+        # If order is preserved, personal locations are the complete route
+        if order_preserved:
+            print(f"[Enhanced LLM] Order preserved - using only personal locations: {[loc['keyword'] for loc in personal_locations]}")
+            return selected_stops
+        
+        # If order not preserved, add remaining stops from standard selection
         remaining_intent = intent.copy()
         remaining_intent["place_types"] = [pt for pt in intent.get("place_types", []) 
                                         if not isinstance(pt, dict) or pt.get("source") != "user_keyword"]

@@ -183,11 +183,19 @@ USER'S LOCATION KEYWORDS DATABASE:
 {knowledge_base}
 
 Analyze the user text and return a JSON response with:
-1. "matched_keywords": Array of keyword strings that the user is referring to
+1. "matched_keywords": Array of keyword strings that the user is referring to (IN ORDER OF MENTION)
 2. "confidence_scores": Array of confidence scores (0.0-1.0) for each matched keyword
 3. "reasoning": Brief explanation of why these keywords were matched
 4. "intent": What the user seems to want to do (visit, find, go to, etc.)
 5. "context": Any additional context about their request
+6. "order_preserved": Boolean indicating if the order of locations was preserved
+7. "wants_alternatives": Boolean indicating if user wants different options (e.g., "feeling like a different place today")
+
+IMPORTANT RULES:
+- PRESERVE ORDER: If user mentions locations in sequence, maintain that order in matched_keywords
+- KEYWORD PRIORITY: If a personal keyword is matched, assume user wants THAT specific location unless they explicitly ask for alternatives
+- ORDER INDICATORS: Look for words like "then", "after", "before", "first", "next" to determine sequence
+- ALTERNATIVE REQUESTS: Only flag wants_alternatives=true if user explicitly asks for different options
 
 Guidelines:
 - Look for DIRECT matches between user text and the keywords in the database
@@ -199,9 +207,10 @@ Guidelines:
 - Be liberal with matching - if it's reasonable, include it
 
 Examples:
-- "I want coffee" + keyword "coffee" → match with confidence 0.9
-- "Let's go to work" + keyword "work" → match with confidence 0.9
-- "I need to hit the gym" + keyword "gym" → match with confidence 0.8
+- "I want coffee" + keyword "coffee" → match with confidence 0.9, order_preserved=true, wants_alternatives=false
+- "I go to work then buy chicken" + keywords ["work", "chicken"] → ["work", "chicken"], order_preserved=true
+- "I go to work but first I will get chicken" + keywords ["work", "chicken"] → ["chicken", "work"], order_preserved=true
+- "I'm feeling like a different coffee place today" + keyword "coffee" → ["coffee"], wants_alternatives=true
 
 Return ONLY valid JSON, no other text.
 """
