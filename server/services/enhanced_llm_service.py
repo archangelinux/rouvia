@@ -1,0 +1,360 @@
+"""
+Enhanced LLM service that integrates Cohere RAG for user keyword checking
+This extends the existing Gemini-based parsing with RAG keyword analysis
+"""
+from google import genai
+import os
+import json
+import math
+from typing import Dict, List, Any, Optional, Tuple
+from services.cohere_rag_location_parser import CohereRAGLocationParser
+
+def _get_gemini_client() -> genai.Client:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set.")
+    return genai.Client(api_key=api_key)
+
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Calculate distance between two points in kilometers using Haversine formula
+    """
+    R = 6371  # Earth's radius in kilometers
+    
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    
+    a = (math.sin(dlat/2) * math.sin(dlat/2) + 
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * 
+         math.sin(dlon/2) * math.sin(dlon/2))
+    
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    distance = R * c
+    
+    return distance
+
+def parse_intent_with_rag(
+    starting_location: str, 
+    text: str, 
+    auth0_user_id: Optional[str] = None,
+    user_location: Optional[Dict[str, float]] = None
+) -> Dict[str, Any]:
+    """
+    Enhanced intent parsing that first checks for user keywords using RAG,
+    then falls back to standard Gemini parsing for unmatched terms.
+    
+    Args:
+        starting_location: The user's starting location as a string
+        text: Transcribed text from user audio input
+        auth0_user_id: User's Auth0 ID for keyword checking
+        user_location: User's current location {"lat": x, "lng": y}
+        
+    Returns:
+        Enhanced intent dictionary with RAG keyword matches
+    """
+    
+    # Step 1: Use Gemini to identify potentially ambiguous words
+    ambiguous_words = _identify_ambiguous_words(text)
+    print(f"[Enhanced LLM] Identified ambiguous words: {ambiguous_words}")
+    
+    # Step 2: Check user keywords for ALL ambiguous words first
+    rag_matches = []
+    unmatched_words = []
+    
+    if auth0_user_id and ambiguous_words:
+        rag_parser = CohereRAGLocationParser()
+        rag_result = rag_parser.parse_user_text_for_keywords(
+            user_text=text,
+            auth0_user_id=auth0_user_id,
+            context_location=user_location
+        )
+        
+        matched_keywords = rag_result.get('matched_keywords', [])
+        location_data = rag_result.get('location_data', [])
+        
+        # Filter matches by distance (20km radius) and confidence
+        if user_location and location_data:
+            filtered_matches = []
+            for match in location_data:
+                location_info = match.get('location_data', {})
+                match_lat = location_info.get('lat')
+                match_lng = location_info.get('lng')
+                confidence = match.get('confidence', 0.5)
+                
+                if match_lat and match_lng:
+                    distance = calculate_distance(
+                        user_location['lat'], user_location['lng'],
+                        match_lat, match_lng
+                    )
+                    
+                    # Only use personal location if it's close AND confident
+                    if distance <= 20 and confidence >= 0.7:  # 20km radius + high confidence
+                        filtered_matches.append({
+                            'keyword': match.get('keyword'),
+                            'location_data': location_info,
+                            'distance_km': round(distance, 2),
+                            'confidence': confidence
+                        })
+                        print(f"[Enhanced LLM] RAG match accepted: {match.get('keyword')} ({distance:.2f}km, confidence: {confidence:.2f})")
+                    else:
+                        print(f"[Enhanced LLM] RAG match rejected: {match.get('keyword')} (distance: {distance:.2f}km, confidence: {confidence:.2f})")
+            
+            rag_matches = filtered_matches
+        
+        # Identify unmatched ambiguous words (these will use Google Places)
+        matched_keyword_names = [match['keyword'] for match in rag_matches]
+        unmatched_words = [word for word in ambiguous_words if word not in matched_keyword_names]
+        print(f"[Enhanced LLM] Unmatched words (will use Google Places): {unmatched_words}")
+    
+    # Step 3: Use standard Gemini parsing for ALL words (including unmatched ones)
+    standard_intent = _parse_intent_standard(starting_location, text)
+    
+    # Step 4: Enhance the intent with RAG matches
+    enhanced_intent = _enhance_intent_with_rag(
+        standard_intent, 
+        rag_matches, 
+        unmatched_words,
+        text
+    )
+    
+    return enhanced_intent
+
+def _identify_ambiguous_words(text: str) -> List[str]:
+    """
+    Use Gemini to identify potentially ambiguous words that could be personal locations
+    """
+    system_rules = """
+    You are a location ambiguity detector. Your job is to identify words in user text that could potentially refer to personal locations or places the user has saved.
+
+    Return a JSON object with:
+    - "ambiguous_words": Array of words/phrases that could be personal locations
+    - "reasoning": Brief explanation of why these words were identified as ambiguous
+
+    Examples of ambiguous words:
+    - "coffee" (could be a specific coffee shop they frequent)
+    - "work" (could be their workplace)
+    - "gym" (could be their specific gym)
+    - "home" (could be their home address)
+    - "mom's house" (could be a saved location)
+    - "the usual spot" (could be a saved location)
+
+    Only identify words that are genuinely ambiguous and could refer to personal locations.
+    Don't include obvious general categories like "restaurant" or "museum" unless context suggests personal reference.
+    """
+    
+    prompt = f"{system_rules}\nUser text: {text}"
+    
+    try:
+        client = _get_gemini_client()
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config={"response_mime_type": "application/json"},
+        )
+        
+        result = json.loads(response.text)
+        ambiguous_words = result.get("ambiguous_words", [])
+        print(f"[Enhanced LLM] Ambiguous words identified: {ambiguous_words}")
+        return ambiguous_words
+        
+    except Exception as e:
+        print(f"[Enhanced LLM] Error identifying ambiguous words: {str(e)}")
+        return []
+
+def _parse_intent_standard(starting_location: str, text: str) -> Dict[str, Any]:
+    """
+    Standard Gemini intent parsing (existing functionality)
+    """
+    system_rules = (
+        "You will first check if the user specifies specific locations. If so, prioritize those locations over general categories. "
+        "If specific locations are provided, return them directly. If only categories are given, proceed to select places based on those categories. "
+        "Return a STRICT JSON object with exactly three keys: "
+        "1) 'place_types': an array where each element can be either a single search term OR an array of related search terms that add context for finding the same destination. These can be specific place names (e.g., 'Starbucks', 'CN Tower'), general categories (e.g., 'coffee shop', 'museum'), or descriptive terms (e.g., 'scenic viewpoint', 'late night food'). When using arrays, all terms should describe the same place to provide better search context. For example: ['coffee shop'] or [['italian restaurant', 'pasta', 'romantic atmosphere', 'downtown new york']] or ['CN Tower']. The array terms will be combined to find one location that matches all the context. "
+        "2) 'last_destination': a string representing the last destination the user wants to visit. This should be the final destination in 'place_types'. "
+        "3) 'search_radius_meters': an integer representing the search radius in meters from the starting location. Default to 10000 meters for general searches, but increase to whatever amount for specific named locations that might be farther away. "
+        "If the user specifies only one destination, 'last_destination' should match that destination, and 'place_types' should contain only that destination. "
+        "Use arrays of terms when the user provides rich context about what they want (atmosphere, location, food type, occasion, etc.) to help find the perfect match. "
+        "No extra text. No markdown. No code fences."
+    )
+
+    prompt = f"{system_rules}\n Starting location: {starting_location}\n User text: {text}"
+
+    client = _get_gemini_client()
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config={"response_mime_type": "application/json"},
+    )
+
+    print(f"Gemini raw response: {response.text}")
+
+    # Parse the JSON string response into a Python dict
+    intent_data = json.loads(response.text)
+    return intent_data
+
+def _enhance_intent_with_rag(
+    standard_intent: Dict[str, Any],
+    rag_matches: List[Dict[str, Any]],
+    unmatched_words: List[str],
+    original_text: str
+) -> Dict[str, Any]:
+    """
+    Enhance the standard intent with RAG keyword matches and handle unmatched words
+    """
+    enhanced_intent = standard_intent.copy()
+    
+    # Add RAG-specific fields
+    enhanced_intent["rag_matches"] = rag_matches
+    enhanced_intent["unmatched_ambiguous_words"] = unmatched_words
+    enhanced_intent["has_personal_locations"] = len(rag_matches) > 0
+    
+    # Modify place_types to include personal locations
+    if rag_matches:
+        personal_locations = []
+        for match in rag_matches:
+            location_data = match['location_data']
+            personal_locations.append({
+                "name": location_data.get('name'),
+                "address": location_data.get('address'),
+                "lat": location_data.get('lat'),
+                "lng": location_data.get('lng'),
+                "place_id": location_data.get('place_id'),
+                "keyword": match['keyword'],
+                "distance_km": match['distance_km'],
+                "confidence": match['confidence'],
+                "source": "user_keyword"
+            })
+        
+        # Add personal locations to place_types
+        if "place_types" not in enhanced_intent:
+            enhanced_intent["place_types"] = []
+        
+        enhanced_intent["place_types"].extend(personal_locations)
+        enhanced_intent["personal_locations"] = personal_locations
+    
+    # Handle unmatched ambiguous words
+    if unmatched_words:
+        enhanced_intent["unmatched_suggestions"] = _generate_unmatched_suggestions(unmatched_words, original_text)
+    
+    return enhanced_intent
+
+def _generate_unmatched_suggestions(unmatched_words: List[str], original_text: str) -> List[Dict[str, str]]:
+    """
+    Generate suggestions for unmatched ambiguous words
+    """
+    suggestions = []
+    
+    for word in unmatched_words:
+        if word.lower() in ["work", "office", "job"]:
+            suggestions.append({
+                "word": word,
+                "suggestion": "Please specify your workplace location or add it to your saved locations",
+                "action": "add_location"
+            })
+        elif word.lower() in ["home", "house"]:
+            suggestions.append({
+                "word": word,
+                "suggestion": "Please specify your home address or add it to your saved locations",
+                "action": "add_location"
+            })
+        elif word.lower() in ["gym", "fitness"]:
+            suggestions.append({
+                "word": word,
+                "suggestion": "Please specify your gym location or add it to your saved locations",
+                "action": "add_location"
+            })
+        else:
+            suggestions.append({
+                "word": word,
+                "suggestion": f"Please specify what '{word}' refers to or add it to your saved locations",
+                "action": "add_location"
+            })
+    
+    return suggestions
+
+def select_stops(intent: dict, candidates: list) -> list:
+    """
+    Enhanced stop selection that prioritizes personal locations from RAG matches
+    """
+    # Check if we have personal locations
+    personal_locations = intent.get("personal_locations", [])
+    
+    if personal_locations:
+        # Prioritize personal locations
+        selected_stops = []
+        
+        # Add personal locations first
+        for personal_loc in personal_locations:
+            selected_stops.append({
+                "name": personal_loc["name"],
+                "address": personal_loc["address"],
+                "lat": personal_loc["lat"],
+                "lng": personal_loc["lng"],
+                "place_id": personal_loc["place_id"],
+                "types": ["personal_location"],  # Required field
+                "rating": 5.0,  # Default high rating for personal locations
+                "user_ratings_total": 1,
+                "source": "user_keyword",
+                "keyword": personal_loc["keyword"],
+                "distance_km": personal_loc["distance_km"],
+                "confidence": personal_loc["confidence"]
+            })
+        
+        # Add remaining stops from standard selection
+        remaining_intent = intent.copy()
+        remaining_intent["place_types"] = [pt for pt in intent.get("place_types", []) 
+                                        if not isinstance(pt, dict) or pt.get("source") != "user_keyword"]
+        
+        if remaining_intent["place_types"]:
+            remaining_stops = _select_stops_standard(remaining_intent, candidates)
+            selected_stops.extend(remaining_stops)
+        
+        return selected_stops
+    else:
+        # Use standard selection
+        return _select_stops_standard(intent, candidates)
+
+def _select_stops_standard(intent: dict, candidates: list) -> list:
+    """
+    Standard Gemini stop selection (existing functionality)
+    """
+    system_rules = (
+        "You are an expert route planner. "
+        "Given a list of candidate places and user intent, select exactly one place per category from the user's requested 'place_types'. Each selected place must match the corresponding category."
+        "Return a STRICT JSON array of place objects, sorted in the order they should be visited, matching the categories in 'place_types' from the user intent. "
+        "For each category, only include one place in the returned list. Do not include multiple places of the same category. "
+        "Choose places based on the following priorities: "
+        "1) User intent (consider the user's specific mention of the place and their context). "
+        "2) Proximity to the starting location (closer places are preferred). "
+        "3) Rating (ONLY CONSIDER RATING IF PROXIMITY AND USER INTENT ARE EQUIVALENT. ALWAYS PRIORITIZE PROXIMITY AND USER INTENT FIRST). "
+        "The last place in the returned list must match the 'last_destination' from the intent. "
+        "If a category has no matching candidates, include the most relevant option from the available candidates. "
+        "No extra text. No markdown. No code fences."
+    )
+
+    # Convert PlaceCandidate objects to dictionaries if needed
+    candidates_dict = []
+    for candidate in candidates:
+        if hasattr(candidate, "__dict__"):
+            # Convert Pydantic model to dict
+            candidates_dict.append(
+                candidate.dict() if hasattr(candidate, "dict") else candidate.__dict__
+            )
+        else:
+            # Already a dictionary
+            candidates_dict.append(candidate)
+
+    prompt = f"{system_rules}\n User intent: {json.dumps(intent)}\n Candidate places: {json.dumps(candidates_dict)}"
+
+    client = _get_gemini_client()
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config={"response_mime_type": "application/json"},
+    )
+
+    print(f"Gemini raw response for select_stops: {response.text}")
+
+    # Parse the JSON string response into a Python list
+    stops = json.loads(response.text)
+    return stops
