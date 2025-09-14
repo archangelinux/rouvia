@@ -132,7 +132,7 @@ export default function FilterPanel() {
         </div>
       )
     }
-    
+
     const sidequestData = {
       "lat": location.latitude,
       "lon": location.longitude,
@@ -150,7 +150,7 @@ export default function FilterPanel() {
     console.log('Sending sidequest data:', sidequestData);
 
     try {
-      const response = await fetch('http://localhost:8000/generate-sidequest', {
+      const response = await fetch('http://localhost:8000/sidequest', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
