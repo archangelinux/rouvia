@@ -14,6 +14,14 @@ export type PlaceStop = {
   google_maps_uri?: string;
   website_uri?: string | null;
   business_status?: string;
+  // Sidequest-specific fields
+  start_time?: string;
+  duration_hours?: number;
+  cost?: number;
+  activity_type?: string;
+  indoor_outdoor?: string;
+  energy_level?: number;
+  confidence?: number;
 };
 
 type Waypoint = [number, number]; // [lng, lat] for Mapbox
