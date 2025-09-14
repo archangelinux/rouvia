@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageCircle, Sparkles, Wand2 } from 'lucide-react';
+import { Wand2 } from 'lucide-react';
 
 interface FilterState {
   energy: number;
@@ -235,7 +235,7 @@ export default function FilterPanel() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 max-h-[40vh] overflow-y-auto">
       <div className="space-y-6">
         {/* Energy Section */}
         <div>
@@ -355,12 +355,6 @@ export default function FilterPanel() {
               placeholder="(km)"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-green-500"
             />
-            <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-              <MessageCircle size={16} />
-            </button>
-            <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-              <Sparkles size={16} />
-            </button>
           </div>
         </div>
 

@@ -4,12 +4,13 @@ from services.sidequest_service import fetch_and_prepare_sidequests
 
 router = APIRouter()
 
-@router.post("/", response_model=SidequestResponse)
+@router.post("/sidequest", response_model=SidequestResponse)
 async def get_sidequests(request: SidequestRequest):
     """
     Sidequest endpoint: fetch real activities from all sources (Google Places, Luma, blogs),
     filter by user preferences, and return a structured itinerary.
     """
+    print("made it")
     results = await fetch_and_prepare_sidequests(
         lat=request.lat,
         lon=request.lon,

@@ -20,6 +20,8 @@ type LngLat = [number, number];
 type StepItem = {
   text: string;
   distance: number; // meters
+  mainInstruction: string;
+  subInstruction: string;
 };
 
 const MAPBOX_TOKEN =
@@ -48,7 +50,6 @@ function nearlySame([aLng, aLat]: LngLat, [bLng, bLat]: LngLat) {
 export default function RoutePlanningPanel() {
   const { userLocation, stops, setStops, setWaypoints } = useRoute();
 
-  const [activeIndex, setActiveIndex] = useState<number>(1);
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<"walking" | "driving" | "cycling">(
     "walking"
@@ -76,9 +77,6 @@ export default function RoutePlanningPanel() {
         place: s,
       });
     }
-    if (activeIndex >= list.length) {
-      setActiveIndex(Math.max(0, list.length - 1));
-    }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userLocation, stops]);
@@ -104,7 +102,7 @@ export default function RoutePlanningPanel() {
       website_uri: null,
     };
     setStops([...stops, newStop]);
-    setActiveIndex(userLocation ? stops.length + 1 : stops.length);
+    // setActiveIndex(userLocation ? stops.length + 1 : stops.length);
   };
 
   /** Build the Mapbox-ready [lng, lat] list from context, validate coords */
@@ -174,9 +172,42 @@ export default function RoutePlanningPanel() {
       const collected: StepItem[] = [];
       for (const leg of legs) {
         for (const step of leg.steps ?? []) {
+          const instruction = step.maneuver?.instruction ?? "";
+          // Parse instruction to separate main and sub parts
+          // Look for common patterns like "Via [Street]" or "Continue to [Street]"
+          let mainInstruction = instruction;
+          let subInstruction = "";
+          
+          // Try to extract sub-instructions like "Turn left", "Turn right", "Continue straight"
+          const turnPatterns = [
+            /^(.*?)\s+(Turn left|Turn right|Continue straight|Go straight|Head|Keep left|Keep right)\.?\s*(.*)$/i,
+            /^(Via .*?)\s+(Turn left|Turn right|Continue straight|Go straight|Head|Keep left|Keep right)\.?\s*(.*)$/i,
+            /^(Continue to .*?)\s+(Turn left|Turn right|Continue straight|Go straight|Head|Keep left|Keep right)\.?\s*(.*)$/i
+          ];
+          
+          for (const pattern of turnPatterns) {
+            const match = instruction.match(pattern);
+            if (match) {
+              mainInstruction = match[1].trim();
+              subInstruction = `${match[2]}${match[3] ? ' ' + match[3] : ''}`.trim();
+              break;
+            }
+          }
+          
+          // If no pattern matched, try simple sentence splitting
+          if (!subInstruction) {
+            const parts = instruction.split('. ');
+            if (parts.length > 1) {
+              mainInstruction = parts[0];
+              subInstruction = parts.slice(1).join('. ');
+            }
+          }
+          
           collected.push({
-            text: step.maneuver?.instruction ?? "",
+            text: instruction,
             distance: step.distance ?? 0,
+            mainInstruction: mainInstruction,
+            subInstruction: subInstruction,
           });
         }
       }
@@ -193,7 +224,7 @@ export default function RoutePlanningPanel() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 max-h-[60vh] overflow-y-auto transition-all">
+    <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 max-h-[52vh] overflow-y-auto transition-all">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-gray-800">Route Planner</h2>
@@ -219,17 +250,11 @@ export default function RoutePlanningPanel() {
         {uiStops.map((s, idx) => (
           <div
             key={s.id}
-            className="relative flex items-start mb-6 cursor-pointer group"
-            onClick={() => setActiveIndex(idx)}
+            className="relative flex items-start mb-6 group"
           >
             {/* Node */}
             <div
-              className={[
-                "w-4 h-4 rounded-full border-2 flex-shrink-0 mt-2 z-10 transition-colors",
-                idx === activeIndex
-                  ? "bg-green-500 border-green-500"
-                  : "bg-white border-gray-300 group-hover:border-green-400",
-              ].join(" ")}
+              className="w-4 h-4 rounded-full border-2 flex-shrink-0 mt-2 z-10 bg-white border-gray-300"
             />
 
             {/* Input */}
@@ -237,18 +262,11 @@ export default function RoutePlanningPanel() {
               <input
                 type="text"
                 value={s.name}
-                disabled={s.kind === "origin"}
-                onChange={(e) => {
-                  if (s.kind === "place") updateStopName(s.id, e.target.value);
-                }}
-                className={[
-                  "w-full px-4 py-3 rounded-lg border text-sm transition-colors",
-                  s.kind === "origin"
-                    ? "bg-gray-100 text-gray-500 border-gray-200"
-                    : "bg-white border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-200",
-                ].join(" ")}
+                disabled={true}
+                readOnly={true}
+                className="w-full px-4 py-3 rounded-lg border text-sm bg-gray-100 text-gray-700 border-gray-200 cursor-default"
                 placeholder={
-                  s.kind === "origin" ? "Your location" : "Enter destination"
+                  s.kind === "origin" ? "Your location" : "Destination"
                 }
               />
               {s.kind === "place" && s.place.address ? (
@@ -300,21 +318,41 @@ export default function RoutePlanningPanel() {
           </div>
         ) : null}
 
+        {/* Route Summary - Duration and Distance */}
         {etaMin != null && distanceKm != null ? (
-          <div className="text-sm text-gray-700 mb-3">
-            <span className="font-semibold">ETA:</span> ~{etaMin} min •{" "}
-            <span className="font-semibold">{distanceKm.toFixed(1)} km</span>
+          <div className="border-t border-gray-200 pt-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="text-lg font-bold text-gray-800">
+                {etaMin >= 60 
+                  ? `${Math.floor(etaMin / 60)}hr ${etaMin % 60} min`
+                  : `${etaMin} min`
+                }
+              </div>
+              <div className="text-sm text-gray-600">
+                {distanceKm.toFixed(1)} km
+              </div>
+            </div>
           </div>
         ) : null}
 
+        {/* Directions List */}
         {steps.length > 0 ? (
-          <ol className="list-decimal list-outside pl-5 space-y-2 text-sm text-gray-800">
+          <div className="space-y-0">
             {steps.map((s, i) => (
-              <li key={i}>
-                <span dangerouslySetInnerHTML={{ __html: s.text }} />
-              </li>
+              <div key={i} className="border-b border-gray-100 last:border-b-0">
+                <div className="py-3">
+                  <div className="text-sm font-medium text-gray-800 mb-1">
+                    {s.mainInstruction}
+                  </div>
+                  {s.subInstruction && (
+                    <div className="text-xs text-gray-500">
+                      {s.subInstruction}
+                    </div>
+                  )}
+                </div>
+              </div>
             ))}
-          </ol>
+          </div>
         ) : (
           <p className="text-xs text-gray-500">
             Turn-by-turn directions will appear here after you press{" "}

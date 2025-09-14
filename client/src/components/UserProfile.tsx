@@ -25,7 +25,7 @@ export default function UserProfile() {
 
       {/* Popup Menu */}
       {isOpen && (
-        <div className="absolute top-0 right-0 -mt-2 w-80 bg-gray-100 rounded-2xl shadow-xl border border-gray-200 z-20 p-6">
+        <div className="absolute top-0 right-0 -mt-2 w-72 bg-gray-50 rounded-2xl shadow-xl border border-gray-200 z-20 p-5">
           {/* Header */}
           <div className="space-y-4">
             {/* Email and Close Button */}
@@ -41,43 +41,43 @@ export default function UserProfile() {
             
             {/* Profile Section */}
             <div className="flex flex-col items-center space-y-3">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl font-semibold">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xl font-semibold">
                 🍊
               </div>
-              <h3 className="text-lg font-bold text-black">Hi, Jack!</h3>
+              <h3 className="text-base font-bold text-black">Hi, Jack!</h3>
             </div>
           </div>
 
           {/* Menu Items */}
-          <div className="space-y-3 mt-4">
+          <div className="space-y-2 mt-5">
             {/* Profile Details Card */}
             <button 
               onClick={() => {
                 setShowProfileDetails(true);
                 setIsOpen(false);
               }}
-              className="w-full text-left bg-white rounded-2xl px-6 py-5 flex items-center space-x-4 transition-colors duration-150"
+              className="w-full text-center bg-white rounded-xl px-4 py-4 flex flex-col items-center space-y-2 transition-colors duration-150 hover:bg-gray-50"
             >
-              <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
-                <Home size={20} className="text-white" />
+              <div className="w-10 h-10 rounded-full bg-green-300 flex items-center justify-center">
+                <Home size={18} className="text-green-700" />
               </div>
-              <span className="font-semibold text-black">Profile Details</span>
+              <span className="text-sm font-medium text-black">Profile Details</span>
             </button>
             
             {/* Add another account */}
-            <button className="w-full text-left bg-white rounded-2xl px-6 py-4 flex items-center space-x-4 transition-colors duration-150">
-              <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center">
-                <Plus size={16} className="text-white" />
+            <button className="w-full text-center bg-white rounded-xl px-4 py-3 flex flex-col items-center space-y-2 transition-colors duration-150 hover:bg-gray-50">
+              <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center">
+                <Plus size={14} className="text-white" />
               </div>
-              <span className="font-medium text-black">Add another account</span>
+              <span className="text-sm font-medium text-black">Add another account</span>
             </button>
             
             {/* Sign out */}
-            <button className="w-full text-left bg-white rounded-2xl px-6 py-4 flex items-center space-x-4 transition-colors duration-150">
-              <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center">
-                <LogOut size={16} className="text-white" />
+            <button className="w-full text-center bg-white rounded-xl px-4 py-3 flex flex-col items-center space-y-2 transition-colors duration-150 hover:bg-gray-50">
+              <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center">
+                <LogOut size={14} className="text-white" />
               </div>
-              <span className="font-medium text-black">Sign out</span>
+              <span className="text-sm font-medium text-black">Sign out</span>
             </button>
           </div>
         </div>

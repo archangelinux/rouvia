@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Mic, Send, MessageCircle, Settings } from "lucide-react";
+import { Mic, Send, MessageCircle, Sparkles } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import { useRoute, type PlaceStop } from "@/components/context/route-context";
 
@@ -332,7 +332,7 @@ export default function ChatInterface() {
       <div className="flex border-b border-gray-100">
         <button
           onClick={() => setMode("chat")}
-          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors rounded-tl-2xl ${
             mode === "chat"
               ? "text-green-600 border-b-2 border-green-600 bg-green-50"
               : "text-gray-500 hover:text-gray-700"
@@ -343,14 +343,14 @@ export default function ChatInterface() {
         </button>
         <button
           onClick={() => setMode("filters")}
-          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors rounded-tr-2xl ${
             mode === "filters"
               ? "text-green-600 border-b-2 border-green-600 bg-green-50"
               : "text-gray-500 hover:text-gray-700"
           }`}
         >
-          <Settings size={16} className="inline mr-2" />
-          Filters
+          <Sparkles size={16} className="inline mr-2" />
+          Sidequest
         </button>
       </div>
 

@@ -110,14 +110,20 @@ export default function MapboxMap() {
         });
       }
 
-      // Optional fog for distance depth
-      map.setFog({
-        range: [0.5, 10],
-        "horizon-blend": 0.1,
-        color: "white",
-        "high-color": "#add8e6",
-        "space-color": "#000000",
-      } as mapboxgl.Fog);
+      // Optional fog for distance depth (only if supported)
+      try {
+        if (map.setFog) {
+          map.setFog({
+            range: [0.5, 10],
+            "horizon-blend": 0.1,
+            color: "white",
+            "high-color": "#add8e6",
+            "space-color": "#000000",
+          } as any);
+        }
+      } catch (error) {
+        console.warn("Fog not supported in this Mapbox GL JS version:", error);
+      }
 
       // Insert 3D buildings below label layers so labels stay readable
       const layers = map.getStyle().layers ?? [];
@@ -230,10 +236,14 @@ export default function MapboxMap() {
         }
 
         const addOrUpdate = () => {
-          const feature = { type: "Feature", properties: {}, geometry };
+          const feature: GeoJSON.Feature<LineString> = { 
+            type: "Feature", 
+            properties: {}, 
+            geometry 
+          };
           if (map.getSource(ROUTE_SOURCE_ID)) {
             (map.getSource(ROUTE_SOURCE_ID) as mapboxgl.GeoJSONSource).setData(
-              feature as any
+              feature
             );
           } else {
             map.addSource(ROUTE_SOURCE_ID, { type: "geojson", data: feature });
@@ -277,7 +287,7 @@ export default function MapboxMap() {
     return () => controller.abort();
   }, [points, stops]);
 
-  return (
+    return (
     <div
       ref={mapContainer}
       className="absolute inset-0 w-full h-full"

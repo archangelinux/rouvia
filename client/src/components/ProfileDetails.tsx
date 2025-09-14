@@ -26,10 +26,12 @@ function LocationSearchModal({ location, onSave, onClose }: LocationSearchModalP
   const [query, setQuery] = useState(location.address);
   const [results, setResults] = useState<string[]>([]);
   const [locationName, setLocationName] = useState(location.name);
+  const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
     if (query.length < 2) {
       setResults([]);
+      setShowResults(false);
       return;
     }
 
@@ -43,6 +45,7 @@ function LocationSearchModal({ location, onSave, onClose }: LocationSearchModalP
         const data = await response.json();
         const places = data.features.map((f: any) => f.place_name);
         setResults(places);
+        setShowResults(true);
       } catch (err) {
         console.error("Error fetching locations:", err);
       }
@@ -96,16 +99,24 @@ function LocationSearchModal({ location, onSave, onClose }: LocationSearchModalP
               placeholder="Search for a location"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setShowResults(false);
+                }
+              }}
               className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             />
 
-            {results.length > 0 && (
+            {showResults && results.length > 0 && (
               <div className="mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                 {results.map((place, index) => (
                   <div
                     key={index}
                     className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                    onClick={() => setQuery(place)}
+                    onClick={() => {
+                      setQuery(place);
+                      setShowResults(false);
+                    }}
                   >
                     {place}
                   </div>

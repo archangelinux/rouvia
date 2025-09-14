@@ -28,6 +28,7 @@ app = FastAPI(
 # CORS middleware
 origins = [
     "http://localhost:3000",  # Allow frontend to access
+    "http://localhost:3001", #allow frontend when docker occupies 3000
     "http://127.0.0.1:3000",
     "http://localhost",
     "http://127.0.0.1",
@@ -35,10 +36,11 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    #allow_origins=origins,      # allow these origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],        # allow all HTTP methods
+    allow_headers=["*"],        # allow all headers
+    allow_origins=["*"]
 )
 
 
@@ -57,7 +59,7 @@ async def health_check():
 
 
 app.include_router(plan_route_audio.router, prefix="", tags=["plan_route"])
-app.include_router(sidequest.router, prefix="/sidequest", tags=["sidequest"])
+app.include_router(sidequest.router, prefix="", tags=["sidequest"])
 
 
 class DebugIntent(BaseModel):
