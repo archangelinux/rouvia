@@ -57,18 +57,18 @@ def select_stops(intent: dict, candidates: list) -> list:
         list: Selected and ranked stops as a list of place dictionaries
     """
     system_rules = (
-    "You are an expert route planner. "
-    "Given a list of candidate places and user intent, select exactly one place per category from the user’s requested 'place_types'. Each selected place must match the corresponding category."
-    "Return a STRICT JSON array of place objects, sorted in the order they should be visited, matching the categories in 'place_types' from the user intent. "
-    "For each category, only include one place in the returned list. Do not include multiple places of the same category. "
-    "Choose places based on the following priorities: "
-    "1) User intent (consider the user’s specific mention of the place and their context). "
-    "2) Rating (higher-rated places are preferred). "
-    "3) Proximity to the starting location (closer places are preferred). "
-    "The last place in the returned list must match the 'last_destination' from the intent. "
-    "If a category has no matching candidates, include the most relevant option from the available candidates. "
-    "No extra text. No markdown. No code fences."
-)
+        "You are an expert route planner. "
+        "Given a list of candidate places and user intent, select exactly one place per category from the user’s requested 'place_types'. Each selected place must match the corresponding category."
+        "Return a STRICT JSON array of place objects, sorted in the order they should be visited, matching the categories in 'place_types' from the user intent. "
+        "For each category, only include one place in the returned list. Do not include multiple places of the same category. "
+        "Choose places based on the following priorities: "
+        "1) User intent (consider the user’s specific mention of the place and their context). "
+        "2) Proximity to the starting location (closer places are preferred). "
+        "3) Rating (higher-rated places are preferred but first prioritize proximity and weigh rating the least). "
+        "The last place in the returned list must match the 'last_destination' from the intent. "
+        "If a category has no matching candidates, include the most relevant option from the available candidates. "
+        "No extra text. No markdown. No code fences."
+    )
 
     # Convert PlaceCandidate objects to dictionaries if needed
     candidates_dict = []
