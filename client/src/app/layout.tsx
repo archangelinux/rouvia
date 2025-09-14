@@ -10,6 +10,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Rouvia - Smart Navigation Assistant",
   description: "Voice-powered AI navigation for hands-free driving",
+  icons: {
+    icon: "/small-logo.svg",
+    shortcut: "/small-logo.svg",
+    apple: "/small-logo.svg",
+  },
 };
 
 export default function RootLayout({

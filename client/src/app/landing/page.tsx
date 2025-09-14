@@ -6,18 +6,18 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function LandingPage() {
   const { login } = useAuth();
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative">
       {/* Background placeholder */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-100"></div>
       
       {/* Left green edge */}
-      <div className="absolute left-0 top-8 bottom-8 w-16 bg-green-500 rounded-r-full opacity-20"></div>
+      <div className="absolute left-0 top-8 bottom-0 w-16 bg-green-500 rounded-r-full opacity-20"></div>
       
       {/* Right green edge */}
-      <div className="absolute right-0 top-8 bottom-8 w-16 bg-green-500 rounded-l-full opacity-20"></div>
+      <div className="absolute right-0 top-8 bottom-0 w-16 bg-green-500 rounded-l-full opacity-20"></div>
       
-      {/* Content - properly centered */}
-      <div className="min-h-screen flex items-center justify-center py-12">
+      {/* Hero Section */}
+      <div className="min-h-[80vh] flex items-center justify-center py-12 relative z-10">
         <div className="max-w-4xl w-full mx-4 relative z-10">
           <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
             
@@ -38,7 +38,7 @@ export default function LandingPage() {
               </div>
 
               {/* Title */}
-              <div>
+              <div className= "mt-[-50px]">
                 <h1 className="text-3xl lg:text-4xl font-bold text-gray-600 mb-6">
                   You can go anywhere.
                 </h1>
@@ -101,6 +101,70 @@ export default function LandingPage() {
           </div>
         </div>
       </div>
+
+      {/* Screenshots Section */}
+      <div className="w-full px-4 py-16 relative z-10 bg-white/80 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">See Rouvia in Action</h2>
+            <p className="text-gray-600 text-lg">Experience the power of AI-driven navigation</p>
+          </div>
+          <div className="space-y-8">
+            {/* Screenshot 1 - Full width */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-2xl">
+                <div className="relative rounded-xl overflow-hidden shadow-2xl hover:shadow-3xl transition-shadow duration-300">
+                  <Image
+                    src="/screenshot-1.png"
+                    alt="Rouvia Screenshot 1 - Voice Navigation Interface"
+                    width={800}
+                    height={600}
+                    className="w-full h-auto object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Screenshots 2 & 3 - Combined width same as first */}
+            <div className="flex justify-center gap-6 md:gap-8 max-w-2xl mx-auto">
+              {/* Screenshot 2 */}
+              <div className="flex-1">
+                <div className="relative rounded-xl overflow-hidden shadow-2xl hover:shadow-3xl transition-shadow duration-300">
+                  <Image
+                    src="/screenshot-2.png"
+                    alt="Rouvia Screenshot 2 - Route Planning"
+                    width={400}
+                    height={600}
+                    className="w-full h-auto object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              </div>
+              
+              {/* Screenshot 3 */}
+              <div className="flex-1">
+                <div className="relative rounded-xl overflow-hidden shadow-2xl hover:shadow-3xl transition-shadow duration-300">
+                  <Image
+                    src="/screenshot-3.png"
+                    alt="Rouvia Screenshot 3 - Sidequest Discovery"
+                    width={400}
+                    height={600}
+                    className="w-full h-auto object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="w-full py-8 bg-gray-50 border-t border-gray-200 relative z-10">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <p className="text-gray-600 text-sm">
+            © 2025 Made with ❤️ at Hack the North
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
