@@ -12,6 +12,9 @@ const MAPBOX_TOKEN =
 
 type LngLat = [number, number];
 
+// -----------------------------
+// Helpers
+// -----------------------------
 function buildDirectionsUrl(
   profile: "driving" | "walking" | "cycling",
   coords: LngLat[]
@@ -26,7 +29,7 @@ function buildDirectionsUrl(
   return `https://api.mapbox.com/directions/v5/mapbox/${profile}/${path}?${params.toString()}`;
 }
 
-// Consider two points the same if within ~0.5m (1e-5 deg ~ 1.1m at equator)
+// ~0.5 m threshold (1e-5° ~1.1 m at equator)
 function nearlySame([aLng, aLat]: LngLat, [bLng, bLat]: LngLat) {
   return Math.abs(aLng - bLng) < 1e-5 && Math.abs(aLat - bLat) < 1e-5;
 }
@@ -42,8 +45,7 @@ export default function MapboxMap() {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
 
-  // Build the effective list of points to render:
-  // If we have userLocation, prepend it unless it's basically the same as the first waypoint.
+  // Compute points to render (prepend user location if present & not duplicate)
   const points: LngLat[] = useMemo(() => {
     const raw = Array.isArray(waypoints) ? waypoints.slice() : [];
     if (userLocation) {
@@ -53,7 +55,9 @@ export default function MapboxMap() {
     return raw;
   }, [waypoints, userLocation]);
 
-  // Initialize the map once
+  // -----------------------------
+  // Map init (3D setup)
+  // -----------------------------
   useEffect(() => {
     if (!mapContainer.current) return;
     if (!MAPBOX_TOKEN || MAPBOX_TOKEN === "YOUR_MAPBOX_TOKEN_HERE") {
@@ -62,14 +66,89 @@ export default function MapboxMap() {
     }
 
     mapboxgl.accessToken = MAPBOX_TOKEN;
+
     const map = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: [-80.524, 43.464], // Waterloo-ish default
+      style: "mapbox://styles/mapbox/streets-v12", // has composite source for buildings
+      center: userLocation
+        ? [userLocation.longitude, userLocation.latitude] // 👈 use user location
+        : [-80.524, 43.464],
       zoom: 12,
-      antialias: true,
+      pitch: 0, // 👈 tilt for 3D
+      bearing: 0, // 👈 rotate for depth
+      antialias: true, // smoother edges for 3D layers
     });
+
+    // Better 3D gesture controls
+    map.dragRotate.enable();
+    map.touchZoomRotate.enableRotation();
     map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
+
+    // When style is ready, add terrain, sky, fog, and 3D buildings
+    const onLoad = () => {
+      // DEM terrain source
+      if (!map.getSource("mapbox-dem")) {
+        map.addSource("mapbox-dem", {
+          type: "raster-dem",
+          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+          tileSize: 512,
+          maxzoom: 14,
+        });
+      }
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.3 });
+
+      // Atmospheric sky
+      if (!map.getLayer("sky")) {
+        map.addLayer({
+          id: "sky",
+          type: "sky",
+          paint: {
+            "sky-type": "atmosphere",
+            "sky-atmosphere-sun": [0.0, 0.0],
+            "sky-atmosphere-sun-intensity": 12,
+          },
+        });
+      }
+
+      // Optional fog for distance depth
+      map.setFog({
+        range: [0.5, 10],
+        "horizon-blend": 0.1,
+        color: "white",
+        "high-color": "#add8e6",
+        "space-color": "#000000",
+      } as mapboxgl.Fog);
+
+      // Insert 3D buildings below label layers so labels stay readable
+      const layers = map.getStyle().layers ?? [];
+      const labelLayerId = layers.find(
+        (l: any) => l.type === "symbol" && l.layout && l.layout["text-field"]
+      )?.id;
+
+      if (!map.getLayer("3d-buildings")) {
+        map.addLayer(
+          {
+            id: "3d-buildings",
+            source: "composite",
+            "source-layer": "building",
+            filter: ["==", "extrude", "true"],
+            type: "fill-extrusion",
+            minzoom: 12,
+            paint: {
+              "fill-extrusion-color": "#aaa",
+              "fill-extrusion-height": ["get", "height"],
+              "fill-extrusion-base": ["get", "min_height"],
+              "fill-extrusion-opacity": 0.6,
+            },
+          },
+          labelLayerId
+        );
+      }
+    };
+
+    if (map.isStyleLoaded()) onLoad();
+    else map.once("load", onLoad);
+
     mapRef.current = map;
 
     return () => {
@@ -82,7 +161,9 @@ export default function MapboxMap() {
     };
   }, []);
 
-  // Render/update route + markers whenever points/stops change
+  // -----------------------------
+  // Route + markers rendering
+  // -----------------------------
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -90,13 +171,11 @@ export default function MapboxMap() {
     const ROUTE_SOURCE_ID = "route";
     const ROUTE_LAYER_ID = "route-line";
 
-    // Helper: clear route layer/source
     const clearRoute = () => {
       if (map.getLayer(ROUTE_LAYER_ID)) map.removeLayer(ROUTE_LAYER_ID);
       if (map.getSource(ROUTE_SOURCE_ID)) map.removeSource(ROUTE_SOURCE_ID);
     };
 
-    // Helper: clear markers
     const clearMarkers = () => {
       if (window.__routeMarkers) {
         window.__routeMarkers.forEach((m) => m.remove());
@@ -104,26 +183,32 @@ export default function MapboxMap() {
       }
     };
 
-    // Start with a clean slate each update
     clearMarkers();
 
-    // If no points, nothing to render
     if (!Array.isArray(points) || points.length === 0) {
       clearRoute();
       return;
     }
 
-    // If only one point, drop a single marker and center
+    // Single point: show a marker and center
     if (points.length === 1) {
       clearRoute();
       const only = points[0];
       const marker = createMarkerForIndex(0, only, stops).addTo(map);
       window.__routeMarkers = [marker];
-      map.flyTo({ center: only, zoom: 14 });
+
+      // Keep the 3D angle when flying
+      map.easeTo({
+        center: only,
+        zoom: 14,
+        pitch: map.getPitch(),
+        bearing: map.getBearing(),
+        duration: 600,
+      });
       return;
     }
 
-    // With 2+ points: fetch directions and draw route
+    // 2+ points: fetch directions and draw route
     const url = buildDirectionsUrl("walking", points);
     const controller = new AbortController();
 
@@ -131,31 +216,27 @@ export default function MapboxMap() {
       try {
         const res = await fetch(url, { signal: controller.signal });
         const data = await res.json();
-
         const geometry = data?.routes?.[0]?.geometry as LineString | undefined;
+
         if (!geometry) {
           console.error("No route returned:", data);
-          // Still show markers even if route failed
           const markers = points.map((p, i) =>
             createMarkerForIndex(i, p, stops).addTo(map)
           );
           window.__routeMarkers = markers;
+          map.easeTo({ pitch: 60, bearing: -17.6, duration: 600 });
           fitToMarkers(map, points);
           return;
         }
 
         const addOrUpdate = () => {
+          const feature = { type: "Feature", properties: {}, geometry };
           if (map.getSource(ROUTE_SOURCE_ID)) {
-            (map.getSource(ROUTE_SOURCE_ID) as mapboxgl.GeoJSONSource).setData({
-              type: "Feature",
-              properties: {},
-              geometry,
-            });
+            (map.getSource(ROUTE_SOURCE_ID) as mapboxgl.GeoJSONSource).setData(
+              feature as any
+            );
           } else {
-            map.addSource(ROUTE_SOURCE_ID, {
-              type: "geojson",
-              data: { type: "Feature", properties: {}, geometry },
-            });
+            map.addSource(ROUTE_SOURCE_ID, { type: "geojson", data: feature });
             map.addLayer({
               id: ROUTE_LAYER_ID,
               type: "line",
@@ -169,43 +250,45 @@ export default function MapboxMap() {
         if (!map.isStyleLoaded()) map.once("load", addOrUpdate);
         else addOrUpdate();
 
-        // Add markers for every point (0 = You)
+        // Markers
         const markers = points.map((p, i) =>
           createMarkerForIndex(i, p, stops).addTo(map)
         );
         window.__routeMarkers = markers;
 
-        // Fit to the route geometry
+        // Animate into a nice 3D camera, then fit to route
+        map.easeTo({ pitch: 60, bearing: -17.6, duration: 600 });
         const coords = geometry.coordinates as LngLat[];
         fitToBounds(map, coords);
       } catch (err) {
         if (controller.signal.aborted) return;
         console.error("Failed to load route:", err);
-        // Fall back to markers only
         clearRoute();
         const markers = points.map((p, i) =>
           createMarkerForIndex(i, p, stops).addTo(map)
         );
         window.__routeMarkers = markers;
+        map.easeTo({ pitch: 60, bearing: -17.6, duration: 600 });
         fitToMarkers(map, points);
       }
     };
 
     render();
-
-    return () => {
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [points, stops]);
 
   return (
     <div
       ref={mapContainer}
       className="absolute inset-0 w-full h-full"
-      aria-label="Mapbox map container"
+      aria-label="Mapbox map container (3D)"
     />
   );
 }
+
+// -----------------------------
+// Marker / Camera utilities
+// -----------------------------
 
 /** Create a styled marker + popup for index i (0 = user). */
 function createMarkerForIndex(
@@ -227,18 +310,16 @@ function createMarkerForIndex(
   let popupHtml: string;
 
   if (i === 0) {
-    // User location pin
     el.style.background = "#2563eb"; // blue
     el.style.color = "white";
     el.textContent = "You";
     popupHtml = `<strong>You</strong><div style="opacity:.8">Current location</div>`;
   } else {
-    // Stop pins start at 1 and map to stops[i-1]
     el.style.background = "#111827"; // near-black
     el.style.color = "white";
     el.textContent = String(i);
 
-    const s = stops?.[i - 1];
+    const s = stops?.[i - 1] as any;
     if (!s) {
       popupHtml = `<strong>Stop ${i}</strong>`;
     } else {
@@ -264,21 +345,32 @@ function createMarkerForIndex(
     .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML(popupHtml));
 }
 
-/** Fit to a set of coordinates (route geometry). */
+/** Fit to a set of coordinates (route geometry) without resetting 3D angle. */
 function fitToBounds(map: mapboxgl.Map, coords: [number, number][]) {
   if (!coords?.length) return;
   const bounds = coords.reduce(
     (b, c) => b.extend(c),
     new mapboxgl.LngLatBounds(coords[0], coords[0])
   );
-  map.fitBounds(bounds, { padding: 50, duration: 800 });
+  map.fitBounds(bounds, {
+    padding: 50,
+    duration: 800,
+    pitch: map.getPitch(),
+    bearing: map.getBearing(),
+  });
 }
 
 /** Fit to marker positions when no route is available. */
 function fitToMarkers(map: mapboxgl.Map, pts: [number, number][]) {
   if (!pts?.length) return;
   if (pts.length === 1) {
-    map.flyTo({ center: pts[0], zoom: 14 });
+    map.easeTo({
+      center: pts[0],
+      zoom: 14,
+      duration: 600,
+      pitch: map.getPitch(),
+      bearing: map.getBearing(),
+    });
     return;
   }
   fitToBounds(map, pts);
