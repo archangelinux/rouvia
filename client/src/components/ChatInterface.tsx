@@ -73,6 +73,54 @@ export default function ChatInterface() {
     setWaypoints(typed.map((s) => [s.lng, s.lat] as [number, number]));
   };
 
+  const loadingMessages = [
+    "Analyzing your request...",
+    "Optimizing route...",
+    "Maximizing ratings...",
+    "Calling Sam Altman...",
+    "Consulting the AI overlords...",
+    "Finding the perfect spots...",
+    "Calculating optimal path...",
+    "Sprinkling some magic...",
+    "Reading the travel tea leaves...",
+    "Coordinating with local pigeons...",
+    "Crunching travel data...",
+    "Polishing your adventure..."
+  ];
+
+  const getRandomLoadingMessage = () => {
+    return loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+  };
+
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const loadingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const createLoadingMessage = () => {
+    const loadingId = appendMessage({ 
+      text: getRandomLoadingMessage(), 
+      role: "assistant" 
+    });
+    
+    // Start cycling through messages
+    setLoadingMessageIndex(0);
+    loadingIntervalRef.current = setInterval(() => {
+      setLoadingMessageIndex(prev => (prev + 1) % loadingMessages.length);
+    }, 1500); // Change message every 1.5 seconds
+    
+    return loadingId;
+  };
+
+  const removeLoadingMessage = (loadingId: string) => {
+    // Stop the interval
+    if (loadingIntervalRef.current) {
+      clearInterval(loadingIntervalRef.current);
+      loadingIntervalRef.current = null;
+    }
+    
+    // Remove the loading message
+    setMessages(prev => prev.filter(m => m.id !== loadingId));
+  };
+
   // Typed message -> POST /plan-route-text (JSON)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +129,9 @@ export default function ChatInterface() {
     appendMessage({ text: message.trim(), role: "user" });
     const outbound = message.trim();
     setMessage("");
+
+    // Add loading message
+    const loadingId = createLoadingMessage();
 
     let location: { latitude: number; longitude: number } | null = null;
     try {
@@ -106,6 +157,9 @@ export default function ChatInterface() {
       });
       const result = await res.json();
 
+      // Remove loading message
+      removeLoadingMessage(loadingId);
+
       pushStopsToContext(result.stops);
 
       const botReply =
@@ -113,6 +167,8 @@ export default function ChatInterface() {
       if (botReply)
         appendMessage({ text: String(botReply), role: "assistant" });
     } catch (err) {
+      // Replace loading message with error
+      removeLoadingMessage(loadingId);
       appendMessage({
         text: "⚠️ Failed to send message to server.",
         role: "system",
@@ -122,7 +178,7 @@ export default function ChatInterface() {
   };
 
   // Voice -> POST /plan-route-audio (multipart/form-data)
-   const handleVoiceClick = async () => {
+  const handleVoiceClick = async () => {
     if (!isRecording) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -160,9 +216,12 @@ export default function ChatInterface() {
           }
 
           const placeholderId = appendMessage({
-            text: "🎙️ Transcribing…",
+            text: "🎙️ Transcribing your voice...",
             role: "user",
           });
+
+          // Add loading message for processing
+          const loadingId = createLoadingMessage();
 
           let location: { latitude: number; longitude: number } | null = null;
           try {
@@ -201,6 +260,9 @@ export default function ChatInterface() {
               transcript || "🎙️ (No transcript returned)"
             );
 
+            // Remove loading message
+            removeLoadingMessage(loadingId);
+
             pushStopsToContext(result.stops);
 
             const botReply: string = result.message || "";
@@ -210,6 +272,12 @@ export default function ChatInterface() {
               placeholderId,
               "⚠️ Transcription failed. Please try again."
             );
+            // Remove loading message and show error
+            removeLoadingMessage(loadingId);
+            appendMessage({
+              text: "⚠️ Processing failed. Please try again.",
+              role: "system",
+            });
             console.error("Failed to send audio:", err);
           }
 
@@ -255,10 +323,12 @@ export default function ChatInterface() {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
+      if (loadingIntervalRef.current) {
+        clearInterval(loadingIntervalRef.current);
+      }
     };
   }, []);
 
-  // ADD THE RETURN STATEMENT HERE - your JSX component
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-200 flex flex-col max-h-[40vh]">
       {/* Mode Toggle */}
@@ -298,26 +368,49 @@ export default function ChatInterface() {
                 ? 1
                 : Math.max(0.3, 1 - (messages.length - index) * 0.1);
 
+              const isLoadingMessage = msg.role === "assistant" && 
+                (msg.text.includes("Analyzing") || msg.text.includes("Optimizing") || 
+                 msg.text.includes("Maximizing") || msg.text.includes("Calling") ||
+                 msg.text.includes("Consulting") || msg.text.includes("Finding") ||
+                 msg.text.includes("Calculating") || msg.text.includes("Sprinkling") ||
+                 msg.text.includes("Reading") || msg.text.includes("Coordinating") ||
+                 msg.text.includes("Crunching") || msg.text.includes("Polishing"));
+
               return (
                 <div
                   key={msg.id}
-                  className="flex justify-end animate-fade-in-left"
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-left`}
                   style={{ opacity }}
                 >
-                  <div className="bg-gray-200 rounded-lg px-4 py-2 max-w-[80%] break-words">
-                    <div className="text-gray-800 text-sm leading-relaxed font-light whitespace-pre-wrap break-words">
-                      {msg.text.split('').map((char, charIndex) => (
-                        <span
-                          key={charIndex}
-                          className="animate-char-fade-in"
-                          style={{ 
-                            animationDelay: `${charIndex * 0.02}s`,
-                            animationFillMode: 'both'
-                          }}
-                        >
-                          {char}
+                  <div className={`rounded-lg px-4 py-2 max-w-[80%] break-words ${
+                    msg.role === 'user' 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-gray-200'
+                  }`}>
+                    <div className={`text-sm leading-relaxed font-light whitespace-pre-wrap break-words ${
+                      msg.role === 'user' ? 'text-white' : 'text-gray-800'
+                    }`}>
+                      {isLoadingMessage ? (
+                        <span className="flex items-center gap-2">
+                          <span className="animate-spin">⟳</span>
+                          <span key={loadingMessageIndex} className="animate-pulse">
+                            {loadingMessages[loadingMessageIndex]}
+                          </span>
                         </span>
-                      ))}
+                      ) : (
+                        msg.text.split('').map((char, charIndex) => (
+                          <span
+                            key={charIndex}
+                            className="animate-char-fade-in"
+                            style={{ 
+                              animationDelay: `${charIndex * 0.02}s`,
+                              animationFillMode: 'both'
+                            }}
+                          >
+                            {char}
+                          </span>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -352,7 +445,7 @@ export default function ChatInterface() {
                 onClick={handleVoiceClick}
                 className={`rounded-full w-10 h-10 flex items-center justify-center transition-colors duration-150 ${
                   isRecording
-                    ? "bg-red-500 text-white"
+                    ? "bg-red-500 text-white animate-pulse"
                     : "text-gray-600 hover:bg-gray-100"
                 }`}
                 title={isRecording ? "Stop recording" : "Voice input"}
