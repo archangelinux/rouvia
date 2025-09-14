@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from "react";
-import { signOut } from 'next-auth/react';
+import { logout } from '@/lib/auth0';
 import { X, Plus, Edit, Trash2 } from 'lucide-react';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -613,10 +613,7 @@ export default function ProfileDetails({ onClose, user }: ProfileDetailsProps) {
             onClick={async () => {
               try {
                 console.log('Signing out...');
-                await signOut({ 
-                  callbackUrl: '/landing',
-                  redirect: true 
-                });
+                await logout();
               } catch (error) {
                 console.error('Sign out error:', error);
                 // Fallback: clear storage and redirect

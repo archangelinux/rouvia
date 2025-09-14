@@ -5,11 +5,16 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const auth0UserId = session.user.id;
+    const auth0UserId = session.user.id || session.user.sub;
+    
+    if (!auth0UserId) {
+      return NextResponse.json({ error: 'User ID not found' }, { status: 401 });
+    }
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     
     const response = await fetch(`${apiUrl}/api/user-profile/${auth0UserId}`, {
@@ -38,12 +43,17 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
-    const auth0UserId = session.user.id;
+    const auth0UserId = session.user.id || session.user.sub;
+    
+    if (!auth0UserId) {
+      return NextResponse.json({ error: 'User ID not found' }, { status: 401 });
+    }
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     
     const response = await fetch(`${apiUrl}/api/user-profile/${auth0UserId}/keywords`, {
@@ -73,7 +83,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const session = await auth();
     
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -84,7 +94,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Keyword parameter is required' }, { status: 400 });
     }
 
-    const auth0UserId = session.user.id;
+    const auth0UserId = session.user.id || session.user.sub;
+    
+    if (!auth0UserId) {
+      return NextResponse.json({ error: 'User ID not found' }, { status: 401 });
+    }
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     
     const response = await fetch(`${apiUrl}/api/user-profile/${auth0UserId}/keywords/${keyword}`, {

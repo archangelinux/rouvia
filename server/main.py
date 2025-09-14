@@ -57,7 +57,7 @@ async def health_check():
 
 
 app.include_router(plan_route_audio.router, prefix="", tags=["plan_route"])
-app.include_router(sidequest.router, prefix="/sidequest", tags=["sidequest"])
+app.include_router(sidequest.router, prefix="", tags=["sidequest"])
 app.include_router(user_profile.router, prefix="", tags=["user_profile"])
 
 

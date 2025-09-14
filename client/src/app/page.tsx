@@ -47,6 +47,9 @@ export default function Home() {
     return null; // Will redirect to landing page
   }
 
+  // Extract user ID for passing to components
+  const userSub = user.sub || user.id || null;
+
   return (
     <RouteProvider>
       <div className="relative w-full h-screen overflow-hidden">
@@ -73,7 +76,7 @@ export default function Home() {
         {/* Left Side - Chat Interface */}
         {chatOpen && (
           <div className="absolute bottom-6 left-6 z-10 w-96">
-            <ChatInterface />
+            <ChatInterface userSub={userSub} />
           </div>
         )}
       </div>

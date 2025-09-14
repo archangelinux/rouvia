@@ -23,9 +23,12 @@ async function getUserLocation(): Promise<{ latitude: number; longitude: number 
   });
 }
 
-export default function ChatInterface() {
-  const { setStops, setWaypoints, setUserLocation } = useRoute();
+interface ChatInterfaceProps {
+  userSub?: string | null;
+}
 
+export default function ChatInterface({ userSub }: ChatInterfaceProps) {
+  const { setStops, setWaypoints, setUserLocation } = useRoute();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -144,6 +147,7 @@ export default function ChatInterface() {
       location: location
         ? { latitude: location.latitude, longitude: location.longitude }
         : null,
+      user_id: userSub,  // Use userSub from props
     };
 
     try {
@@ -234,6 +238,7 @@ export default function ChatInterface() {
           const formData = new FormData();
           formData.append("audio", blob, filename);
           if (location) formData.append("location", JSON.stringify(location));
+          if (userSub) formData.append("user_id", userSub);  // Use userSub from props
 
           console.log("📤 Sending FormData with blob size:", blob.size);
 
@@ -406,7 +411,7 @@ export default function ChatInterface() {
                             {char}
                           </span>
                         ))
-                      )}
+                )}
                     </div>
                   </div>
                 </div>

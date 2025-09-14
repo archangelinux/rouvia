@@ -68,7 +68,7 @@ def _build_places_intent(
 
 
 def _pipeline_from_text(
-    text: str, lat: Optional[float], lng: Optional[float]
+    text: str, lat: Optional[float], lng: Optional[float], user_id: Optional[str] = None
 ) -> PlanRouteAudioResponse:
     """
     Shared pipeline: parse intent -> search places -> select stops -> build response.
@@ -79,8 +79,10 @@ def _pipeline_from_text(
         else None
     )
 
-    # 2) LLM parse intent
-    intent = llm_service.parse_intent(starting_location, text)
+    print(f"🔄 Pipeline starting with user_id: {user_id}")
+
+    # 2) LLM parse intent with user_id for keyword resolution
+    intent = llm_service.parse_intent(starting_location, text, user_id)
 
     # 3) Places intent
     places_intent = _build_places_intent(intent, lat, lng)
@@ -88,8 +90,8 @@ def _pipeline_from_text(
     # 4) Google Places candidates
     candidates = google_places.search(places_intent)
 
-    # 5) LLM selects actual stops
-    stops = llm_service.select_stops(intent, candidates)
+    # 5) LLM selects actual stops with user_id for personalized preferences
+    stops = llm_service.select_stops(intent, candidates, user_id)
 
     # 6) Response
     return PlanRouteAudioResponse(
@@ -109,9 +111,10 @@ async def plan_route_audio(
     location: Optional[str] = Form(
         None
     ),  # optional JSON string {"latitude":..., "longitude":...}
+    user_id: Optional[str] = Form(None),  # Add user_id support
 ):
     """
-    Accepts an audio file upload and optional location JSON.
+    Accepts an audio file upload, optional location JSON, and optional user_id.
     Saves the file, transcribes with Whisper, runs intent->places->stops pipeline, returns final response.
     """
 
@@ -119,6 +122,7 @@ async def plan_route_audio(
         print(f"🎵 === STARTING AUDIO PROCESSING ===")
         print(f"🎵 Audio filename: {audio.filename}")
         print(f"🎵 Audio content type: {audio.content_type}")
+        print(f"🎵 User ID: {user_id}")
         
         # Parse optional location first
         lat, lng = _parse_location_json(location)
@@ -146,9 +150,9 @@ async def plan_route_audio(
         text = speech_to_text.transcribe(audio)
         print(f"📝 Transcription complete: {text}")
 
-        # 4) Run the pipeline
-        print(f"🔄 Starting pipeline...")
-        result = _pipeline_from_text(text=text, lat=lat, lng=lng)
+        # 4) Run the pipeline with user_id
+        print(f"🔄 Starting pipeline with user_id: {user_id}")
+        result = _pipeline_from_text(text=text, lat=lat, lng=lng, user_id=user_id)
         print(f"✅ Pipeline complete")
         return result
     except HTTPException:
@@ -168,15 +172,18 @@ class PlanRouteTextRequest(BaseModel):
     location: Optional[Dict[str, Any]] = (
         None  # supports {latitude, longitude} or {lat, lng}
     )
+    user_id: Optional[str] = None  # Add user_id support
 
 
 @router.post("/plan-route-text", response_model=PlanRouteAudioResponse)
 async def plan_route_text(payload: PlanRouteTextRequest):
     """
-    Accepts typed text + optional location JSON via application/json.
+    Accepts typed text, optional location JSON, and optional user_id via application/json.
     Runs the same pipeline used by the audio route (skipping transcription).
     """
     try:
+        print(f"📝 Text route with user_id: {payload.user_id}")
+        
         lat = None
         lng = None
         if payload.location:
@@ -185,7 +192,7 @@ async def plan_route_text(payload: PlanRouteTextRequest):
             lat = float(lat) if lat is not None else None
             lng = float(lng) if lng is not None else None
 
-        return _pipeline_from_text(text=payload.text, lat=lat, lng=lng)
+        return _pipeline_from_text(text=payload.text, lat=lat, lng=lng, user_id=payload.user_id)
 
     except HTTPException:
         raise
