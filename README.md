@@ -12,7 +12,7 @@
   <p align="center">
     AI voice assistant for your everyday travels  
     <br />
-    <a href="[https://www.youtube.com](https://youtu.be/BBaWlYHI5M0)" target="_blank"><strong>View Demo »</strong></a>
+    <a href="https://youtu.be/BBaWlYHI5M0" target="_blank"><strong>View Demo »</strong></a>
     <br />
   </p>
 </div>
